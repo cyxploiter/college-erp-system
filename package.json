@@ -1,0 +1,27 @@
+
+{
+  "name": "college-erp-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Monorepo for College ERP System",
+  "scripts": {
+    "dev": "pnpm --parallel dev",
+    "dev:frontend": "pnpm --filter frontend dev",
+    "dev:backend": "pnpm --filter backend dev",
+    "build": "pnpm --parallel build",
+    "build:frontend": "pnpm --filter frontend build",
+    "build:backend": "pnpm --filter backend build",
+    "lint": "pnpm --parallel lint",
+    "clean": "pnpm --parallel clean && rm -rf node_modules",
+    "db:init": "pnpm --filter backend db:init",
+    "db:seed": "pnpm --filter backend db:seed",
+    "postinstall": "pnpm -r --if-present postinstall"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  }
+}

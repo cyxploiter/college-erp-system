@@ -1,0 +1,133 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* GitHub inspired theme variables for Shadcn UI */
+@layer base {
+  :root {
+    /* GitHub Official Colors - Light Theme */
+    --background: 0 0% 100%; /* #FFFFFF */
+    --foreground: 215 14% 16%; /* #24292F - GitHub's primary text color */
+
+    --card: 0 0% 100%; /* #FFFFFF - like GitHub's main content cards */
+    --card-foreground: 215 14% 16%; /* #24292F */
+
+    --popover: 0 0% 100%; /* #FFFFFF */
+    --popover-foreground: 215 14% 16%; /* #24292F */
+
+    --primary: 215 97.4% 44.9%; /* #0969DA - GitHub Blue */
+    --primary-foreground: 210 16.7% 97.3%; /* #F6F8FA - Light gray for text on primary */
+    
+    --secondary: 210 16.7% 97.3%; /* Using --muted for secondary bg #F6F8FA */
+    --secondary-foreground: 215 14% 16%; /* --foreground for text on secondary */
+
+    --muted: 210 16.7% 97.3%; /* #F6F8FA - For subtle background elements */
+    --muted-foreground: 214 7% 43.4%; /* #636C76 - Lighter gray text for muted elements */
+
+    --accent: 210 16.7% 97.3%; /* #F6F8FA - For hover/active backgrounds of secondary elements (can be adjusted) */
+    --accent-foreground: 215 14% 16%; /* --foreground */
+
+    --destructive: 356 71.4% 47.3%; /* #CF222E - GitHub Red (using a slightly more accurate HSL for the hex) */
+                                      /* Prompt's HSL: 356 71.4% 59% - if this is preferred, use it */
+    /* --destructive: 356 71.4% 59%; */ /* Using prompt's HSL for destructive */
+    --destructive-foreground: 210 16.7% 97.3%; /* #F6F8FA */
+
+    --success: 148 62.1% 40.8%; /* #2DA44E - GitHub Green */
+    --success-foreground: 210 16.7% 97.3%; /* #F6F8FA */
+
+    --border: 210 14% 84.1%; /* #D0D7DE - Light gray for borders */
+    --input: 210 14% 84.1%; /* #D0D7DE - Same as border for GitHub style */
+    --ring: 215 97.4% 44.9%; /* #0969DA - Primary blue for focus rings */
+
+    --radius: 0.375rem; /* default 6px like GitHub */
+  }
+
+  /* Minimal dark theme (can be expanded later) */
+  .dark {
+    /* Example dark theme based on GitHub Dark - adjust as needed */
+    --background: 220 13% 10%; /* approx #161B22 */
+    --foreground: 210 20% 85%; /* approx #C9D1D9 */
+
+    --card: 220 13% 13%; /* approx #1C2128 */
+    --card-foreground: 210 20% 85%;
+
+    --popover: 220 13% 13%;
+    --popover-foreground: 210 20% 85%;
+
+    --primary: 212 92% 58%; /* approx #388BFD */
+    --primary-foreground: 220 13% 10%; /* Dark text on light blue */
+    
+    --secondary: 220 10% 20%; /* approx #2A3037 */
+    --secondary-foreground: 210 20% 85%;
+
+    --muted: 220 10% 15%; /* approx #21262D */
+    --muted-foreground: 212 10% 55%; /* approx #8B949E */
+
+    --accent: 220 10% 20%;
+    --accent-foreground: 210 20% 85%;
+
+    --destructive: 356 78% 63%; /* approx #F85149 */
+    --destructive-foreground: 220 13% 10%;
+
+    --success: 139 55% 50%; /* approx #3FB950 */
+    --success-foreground: 220 13% 10%;
+
+    --border: 216 10% 25%; /* approx #30363D */
+    --input: 216 10% 25%;
+    --ring: 212 92% 58%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1; /* Enable common ligatures */
+  }
+  /* GitHub-like link styling */
+  a {
+    @apply text-primary hover:underline;
+  }
+  /* Input and Button base styles for GitHub feel */
+  input[type="text"],
+  input[type="password"],
+  input[type="email"],
+  input[type="search"],
+  input[type="number"],
+  textarea,
+  select {
+     @apply bg-background border border-input rounded-md px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
+     /* GitHub input specific shadow on focus */
+     @apply focus-visible:shadow-[0_0_0_3px_rgba(9,105,218,0.3)]; /* Equivalent to primary ring color with alpha */
+  }
+   /* For Shadcn UI form components to pick up GitHub specific styles */
+  .shadcn-input { /* Add this class to Shadcn Input components if default isn't picking up focus shadow */
+     @apply focus-visible:shadow-[0_0_0_3px_rgba(9,105,218,0.3)];
+  }
+
+  h1,h2,h3,h4,h5,h6 {
+    @apply font-semibold text-foreground;
+  }
+  h1 { @apply text-2xl; } /* GitHub h1 is often around 24px-26px semibold */
+  h2 { @apply text-xl; } /* GitHub h2 is often around 20px-22px semibold */
+
+  /* Basic scrollbar styling (optional, for a more GitHub-like feel on WebKit) */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: hsl(var(--muted) / 0.5);
+    border-radius: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 10px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground));
+  }
+}

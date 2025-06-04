@@ -1,0 +1,6 @@
+{
+  "name": "College ERP System",
+  "description": "A production-ready College ERP System with a GitHub-inspired UI, designed for local development within a pnpm monorepo. Features user management, academic scheduling, and real-time announcements.",
+  "requestFramePermissions": [],
+  "prompt": ""
+}
