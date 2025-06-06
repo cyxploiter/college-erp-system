@@ -1,3 +1,4 @@
+
 'use client';
 import React, { useState, useMemo, useEffect } from 'react';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -9,20 +10,12 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Briefcase, UserPlus, ArrowLeft, Edit, Trash2, MoreHorizontal, Search, Loader2, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
-import { useToast } from '@/components/hooks/use-toast';
+import { useToast } from '@/components/ui/use-toast';
 import { UserFormDialog, UserFormValues } from '@/components/admin/UserFormDialog';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { Department, UserProfileResponse, CreateUserInput, UserPayload, APIResponse, UpdateUserInput } from '@college-erp/common';
 import apiClient from '@/lib/apiClient';
 import { useQueryClient, useMutation, useQuery } from '@tanstack/react-query';
-import {
-  useReactTable,
-  getCoreRowModel,
-  getSortedRowModel,
-  flexRender,
-  ColumnDef,
-  SortingState,
-} from '@tanstack/react-table';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -36,7 +29,7 @@ const fetchAllDepartments = async (): Promise<Department[]> => {
     return response.data.data || [];
 };
 
-const fetchUserProfile = async (userId: number): Promise<UserProfileResponse> => {
+const fetchUserProfile = async (userId: string): Promise<UserProfileResponse> => { // userId is string
     const response = await apiClient.get<APIResponse<UserProfileResponse>>(`/users/${userId}`);
     return response.data.data!;
 };
@@ -52,13 +45,11 @@ export default function ManageFacultyPage() {
   const [editingUserFullProfile, setEditingUserFullProfile] = useState<UserProfileResponse | null>(null); 
   const [isEditingMode, setIsEditingMode] = useState(false);
   const [isConfirmDeleteDialogOpen, setIsConfirmDeleteDialogOpen] = useState(false);
-  const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null); // userId is string
   const [isFetchingProfileForEdit, setIsFetchingProfileForEdit] = useState(false);
-  const [currentlyEditingFacultyId, setCurrentlyEditingFacultyId] = useState<number | null>(null);
-  const [sorting, setSorting] = React.useState<SortingState>([]);
 
   const { data: allUsers, isLoading: usersLoading, error: usersError } = useQuery<UserPayload[], Error>({
-    queryKey: ['allAdminUsersForFacultyPage'], // Unique key for this page's specific fetch if needed, or use global 'allAdminUsers'
+    queryKey: ['allAdminUsersForFacultyPage'], 
     queryFn: fetchAdminUsers,
   });
 
@@ -72,7 +63,7 @@ export default function ManageFacultyPage() {
     const filtered = allUsers.filter(u => u.role === 'faculty');
     if (!searchTerm) return filtered;
     return filtered.filter(
-      u => u.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      u => u.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
            u.email.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [allUsers, searchTerm]);
@@ -87,7 +78,7 @@ export default function ManageFacultyPage() {
     mutationFn: (newUserData) => apiClient.post<APIResponse<UserPayload>>('/users', newUserData).then(res => res.data.data!),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['allAdminUsersForFacultyPage'] });
-      queryClient.invalidateQueries({ queryKey: ['allAdminUsers'] }); // Invalidate general query too
+      queryClient.invalidateQueries({ queryKey: ['allAdminUsers'] }); 
       toast({ title: "Faculty Created", description: "New faculty member has been successfully added.", variant: "default", className: "bg-success text-success-foreground border-success" });
       setIsUserFormOpen(false);
     },
@@ -96,7 +87,7 @@ export default function ManageFacultyPage() {
     },
   });
   
-   const updateUserMutation = useMutation<UserPayload, Error, { userId: number; data: UpdateUserInput }>({
+   const updateUserMutation = useMutation<UserPayload, Error, { userId: string; data: UpdateUserInput }>({ // userId is string
     mutationFn: ({ userId, data }) => apiClient.put<APIResponse<UserPayload>>(`/users/${userId}`, data).then(res => res.data.data!),
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['allAdminUsersForFacultyPage'] });
@@ -108,7 +99,7 @@ export default function ManageFacultyPage() {
     onError: (error) => toast({ title: "Update Failed", description: error.message, variant: "destructive" }),
   });
 
-  const deleteUserMutation = useMutation<void, Error, number>({
+  const deleteUserMutation = useMutation<void, Error, string>({ // userId is string
     mutationFn: (userId) => apiClient.delete(`/users/${userId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['allAdminUsersForFacultyPage'] });
@@ -128,40 +119,37 @@ export default function ManageFacultyPage() {
     setIsUserFormOpen(true);
   };
 
-  const handleOpenEditDialog = async (facultyUser: UserPayload) => {
+  const handleOpenEditDialog = async (facultyUser: UserPayload) => { // facultyUser.id is string
     setIsFetchingProfileForEdit(true);
-    setCurrentlyEditingFacultyId(facultyUser.id);
     try {
-        const profile = await fetchUserProfile(facultyUser.id);
+        const profile = await fetchUserProfile(facultyUser.id); // Pass string ID
         setEditingUserFullProfile(profile);
         setIsEditingMode(true);
         setIsUserFormOpen(true);
     } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Could not fetch faculty details for editing.";
-        toast({ title: "Error", description: errorMessage, variant: "destructive" });
+        toast({ title: "Error", description: "Could not fetch faculty details for editing.", variant: "destructive" });
     } finally {
         setIsFetchingProfileForEdit(false);
-        setCurrentlyEditingFacultyId(null);
     }
   };
 
-  const handleOpenDeleteDialog = (userId: number) => {
+  const handleOpenDeleteDialog = (userId: string) => { // userId is string
     setDeletingUserId(userId);
     setIsConfirmDeleteDialogOpen(true);
   };
   
-  const onUserFormSubmit = async (values: UserFormValues, isEditingSubmit: boolean) => {
-    const departmentIdNumber = values.departmentId ? parseInt(values.departmentId, 10) : null;
+  // onSubmit for UserFormDialog now expects departmentId to be number | null
+  const onUserFormSubmit = async (values: UserFormValues & { departmentId?: number | null }, isEditingSubmit: boolean) => {
      if (isEditingSubmit && editingUserFullProfile) {
        const updatePayload: UpdateUserInput = { 
-           username: values.username, 
+           name: values.name, 
            email: values.email, 
-           departmentId: departmentIdNumber, 
+           profilePictureUrl: values.profilePictureUrl,
+           departmentId: values.departmentId, 
            officeNumber: values.officeNumber, 
            specialization: values.specialization,
-           // role: 'faculty' // Role change not allowed usually
         };
-       await updateUserMutation.mutateAsync({ userId: editingUserFullProfile.id, data: updatePayload });
+       await updateUserMutation.mutateAsync({ userId: editingUserFullProfile.id, data: updatePayload }); // editingUserFullProfile.id is string
     } else {
       if (!values.password) { 
         toast({ title: "Validation Error", description: "Password is required for new users.", variant: "destructive" });
@@ -172,11 +160,12 @@ export default function ManageFacultyPage() {
          return;
        }
       const createPayload: CreateUserInput = {
-        username: values.username,
+        name: values.name,
         email: values.email,
+        profilePictureUrl: values.profilePictureUrl,
         password_DO_NOT_USE_THIS_FIELD_EVER_EXCEPT_ON_CREATE_ONLY: values.password,
         role: 'faculty', 
-        departmentId: departmentIdNumber,
+        departmentId: values.departmentId,
         officeNumber: values.officeNumber,
         specialization: values.specialization,
       };
@@ -192,86 +181,6 @@ export default function ManageFacultyPage() {
 
   const pageIsLoading = usersLoading || departmentsLoading;
   const pageError = usersError || departmentsError;
-
-  const columns = useMemo<ColumnDef<UserPayload>[]>(() => [
-    {
-      accessorKey: 'username',
-      header: ({ column }) => (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="px-1"
-        >
-          Username
-          {column.getIsSorted() === "asc" ? <span className="ml-1">▲</span> : column.getIsSorted() === "desc" ? <span className="ml-1">▼</span> : ""}
-        </Button>
-      ),
-      cell: ({ row }) => <div className="font-medium">{row.getValue('username')}</div>,
-    },
-    {
-      accessorKey: 'email',
-      header: ({ column }) => (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="px-1"
-        >
-          Email
-          {column.getIsSorted() === "asc" ? <span className="ml-1">▲</span> : column.getIsSorted() === "desc" ? <span className="ml-1">▼</span> : ""}
-        </Button>
-      ),
-      cell: ({ row }) => row.getValue('email'),
-    },
-    {
-      accessorKey: 'departmentId',
-      header: 'Department',
-      cell: ({ row }) => {
-        const departmentId = row.getValue('departmentId') as number | null;
-        return departmentId ? departmentMap.get(departmentId) || 'N/A' : 'N/A';
-      },
-      enableSorting: false,
-    },
-    {
-      id: 'actions',
-      header: () => <div className="text-right">Actions</div>,
-      cell: ({ row }) => {
-        const faculty = row.original;
-        const isLoadingThisRow = isFetchingProfileForEdit && currentlyEditingFacultyId === faculty.id;
-        return (
-          <div className="text-right">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="h-8 w-8 p-0" disabled={isLoadingThisRow}>
-                  {isLoadingThisRow ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => handleOpenEditDialog(faculty)}>
-                  <Edit className="mr-2 h-4 w-4" /> Edit
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => handleOpenDeleteDialog(faculty.id)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                  <Trash2 className="mr-2 h-4 w-4" /> Delete
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        );
-      },
-      enableSorting: false,
-    },
-  ], [departmentMap, isFetchingProfileForEdit, currentlyEditingFacultyId, handleOpenEditDialog, handleOpenDeleteDialog]); // Added handlers as they are used in cell
-
-  const table = useReactTable({
-    data: facultyUsers,
-    columns,
-    state: {
-      sorting,
-    },
-    onSortingChange: setSorting,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-  });
 
   return (
     <ProtectedRoute allowedRoles={['admin']}>
@@ -318,65 +227,61 @@ export default function ManageFacultyPage() {
                     </div>
                 )}
                 {!pageIsLoading && !pageError && (
-                    <div className="max-h-[60vh] overflow-y-auto scrollbar-thin">
-                        <Table>
-                          <TableHeader className="sticky top-0 bg-card z-10">
-                            {table.getHeaderGroups().map(headerGroup => (
-                              <TableRow key={headerGroup.id}>
-                                {headerGroup.headers.map(header => (
-                                  <TableHead key={header.id}>
-                                    {header.isPlaceholder
-                                      ? null
-                                      : flexRender(
-                                          header.column.columnDef.header,
-                                          header.getContext()
-                                        )}
-                                  </TableHead>
-                                ))}
-                              </TableRow>
-                            ))}
-                          </TableHeader>
-                          <TableBody>
-                            {table.getRowModel().rows?.length ? (
-                              table.getRowModel().rows.map(row => (
-                                <TableRow
-                                  key={row.id}
-                                  data-state={row.getIsSelected() && "selected"}
-                                >
-                                  {row.getVisibleCells().map(cell => (
-                                    <TableCell key={cell.id}>
-                                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Faculty ID</TableHead>
+                                <TableHead>Name</TableHead>
+                                <TableHead>Email</TableHead>
+                                <TableHead>Department</TableHead>
+                                <TableHead className="text-right">Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {facultyUsers.length > 0 ? facultyUsers.map((faculty) => ( // faculty.id is string
+                                <TableRow key={faculty.id}>
+                                    <TableCell className="font-mono text-xs">{faculty.id}</TableCell>
+                                    <TableCell className="font-medium">{faculty.name}</TableCell>
+                                    <TableCell>{faculty.email}</TableCell>
+                                    <TableCell>{faculty.departmentId ? departmentMap.get(faculty.departmentId) || 'N/A' : 'N/A'}</TableCell>
+                                    <TableCell className="text-right">
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" className="h-8 w-8 p-0" disabled={isFetchingProfileForEdit && editingUserFullProfile?.id === faculty.id}>
+                                                    {isFetchingProfileForEdit && editingUserFullProfile?.id === faculty.id ? <Loader2 className="h-4 w-4 animate-spin"/> : <MoreHorizontal className="h-4 w-4" />}
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end">
+                                                <DropdownMenuItem onClick={() => handleOpenEditDialog(faculty)}>
+                                                    <Edit className="mr-2 h-4 w-4" /> Edit
+                                                </DropdownMenuItem>
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem onClick={() => handleOpenDeleteDialog(faculty.id)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                                                    <Trash2 className="mr-2 h-4 w-4" /> Delete
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
                                     </TableCell>
-                                  ))}
                                 </TableRow>
-                              ))
-                            ) : (
-                                    <TableRow>
-                                        <TableCell 
-                                          colSpan={columns.length} 
-                                          className="h-24 text-center text-muted-foreground py-6"
-                                        >
-                                            {searchTerm ? 'No faculty members match your search.' : 'No faculty members found.'}
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                         </Table>
-                    </div>
+                            )) : (
+                                <TableRow>
+                                    <TableCell colSpan={5} className="text-center text-muted-foreground py-6"> {/* Adjusted colSpan */}
+                                        {searchTerm ? 'No faculty members match your search.' : 'No faculty members found.'}
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                         <TableCaption>{facultyUsers.length} faculty member(s) found.</TableCaption>
+                    </Table>
                 )}
             </CardContent>
-             {!pageIsLoading && !pageError && facultyUsers.length > 0 && (
-                <CardFooter className="pt-4">
-                    <TableCaption className="mt-0">{facultyUsers.length} faculty member(s) found.</TableCaption>
-                </CardFooter>
-             )}
         </Card>
 
          <UserFormDialog 
             isOpen={isUserFormOpen} 
             onOpenChange={setIsUserFormOpen}
             onSubmit={onUserFormSubmit}
-            defaultValues={editingUserFullProfile || { role: 'faculty' }}
+            defaultValues={editingUserFullProfile || { role: 'faculty', departmentId: null }} // Pass null for departmentId initially
             isEditing={isEditingMode}
             departments={departments || []}
             isLoading={createUserMutation.isPending || updateUserMutation.isPending || departmentsLoading || isFetchingProfileForEdit}

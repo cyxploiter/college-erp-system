@@ -16,7 +16,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { usePathname } from 'next/navigation';
 import React from 'react';
 
-// CollegeIcon can be moved to a shared icons file if used elsewhere
 const CollegeIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg fill="currentColor" viewBox="0 0 20 20" {...props}>
     <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3.5a1 1 0 00.002 1.792l7 3.5a1 1 0 00.786 0l7-3.5a1 1 0 00.002-1.792l-7-3.5zM3 9V17a1 1 0 001 1h12a1 1 0 001-1V9l-7 3.5L3 9z"></path>
@@ -38,7 +37,7 @@ export function Header({ onMobileMenuToggle, isMobileMenuOpen }: HeaderProps) {
     let initials = parts[0]?.[0] || '';
     if (parts.length > 1) {
       initials += parts[parts.length - 1]?.[0] || '';
-    } else if (name.length > 1 && parts[0].length > 1) {
+    } else if (name.length > 1 && parts[0].length > 1) { // Changed from name.length > 1
       initials = name.substring(0, 2);
     } else if (initials === '') { 
         initials = name.substring(0,1) || 'U';
@@ -50,7 +49,6 @@ export function Header({ onMobileMenuToggle, isMobileMenuOpen }: HeaderProps) {
   return (
     <header className="sticky top-0 z-40 w-full border-b border-border bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/75 shadow-header">
       <div className="container flex h-16 items-center px-4 sm:px-6">
-        {/* Mobile Menu Toggle - visible on small screens, triggers sidebar */}
         {isAuthenticated() && user && (
           <Button
             variant="ghost"
@@ -68,24 +66,25 @@ export function Header({ onMobileMenuToggle, isMobileMenuOpen }: HeaderProps) {
           <span className="font-bold text-lg sm:text-xl text-foreground hover:text-primary transition-colors">CollegeERP</span>
         </Link>
         
-        {/* Spacer to push profile menu to the right */}
         <div className="flex-1" /> 
 
         <div className="flex items-center space-x-2 sm:space-x-3">
           {isAuthenticated() && user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h:10 w:10 rounded-full">
+                <Button variant="ghost" className="relative h-9 w-9 rounded-full">
                   <Avatar className="h-full w-full border border-transparent group-hover:border-primary transition-colors">
-                    <AvatarImage src={`https://ui-avatars.com/api/?name=${encodeURIComponent(user?.username || 'U')}&background=3B82F6&color=FFFFFF&size=128`} alt={user?.username} />
-                                    <AvatarFallback className="text-3xl bg-muted text-muted-foreground">{getInitials(user?.username)}</AvatarFallback>
-                                      </Avatar>
+                    <AvatarImage 
+                      src={user.profilePictureUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&background=3B82F6&color=FFFFFF&bold=true&size=40`} 
+                      alt={user.name} />
+                    <AvatarFallback className="text-xs font-semibold bg-muted text-muted-foreground">{getInitials(user.name)}</AvatarFallback>
+                  </Avatar>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-56" align="end" forceMount>
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none text-foreground">{user.username}</p>
+                    <p className="text-sm font-medium leading-none text-foreground">{user.name}</p> {/* Changed from user.username */}
                     <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
                   </div>
                 </DropdownMenuLabel>

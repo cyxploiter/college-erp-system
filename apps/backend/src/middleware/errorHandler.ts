@@ -32,10 +32,10 @@ export const errorHandler = (
     statusCode = err.status;
     message = err.message;
     errorDetails = err.details;
-    logger.warn(
-      `HttpError [${statusCode}] on ${reqMethod} ${reqOriginalUrl}: ${message}`,
-      { details: errorDetails, stack: err.stack }
-    );
+    // logger.warn(
+    //   `HttpError [${statusCode}] on ${reqMethod} ${reqOriginalUrl}: ${message}`,
+    //   { details: errorDetails, stack: err.stack }
+    // );
   } else if (err instanceof ZodError) {
     statusCode = 400; // Bad Request
     message = "Validation failed.";

@@ -12,34 +12,29 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; // Assuming added
-import { useToast } from "@/components/hooks/use-toast";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/components/ui/use-toast";
 import { format } from 'date-fns';
 import { Inbox, Send, AlertCircle, Edit3, Eye, Trash2, Users, CheckCircle } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { z } from 'zod';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { cn } from '@/lib/utils'; // Added import for cn
+import { cn } from '@/lib/utils'; 
 
 const fetchMessages = async (): Promise<Message[]> => {
   const response = await apiClient.get<{ data: Message[] }>('/messages/my');
   return response.data.data;
 };
 
-// For admin/faculty to send messages, they might need a list of users
 const fetchUsersForMessaging = async (): Promise<UserPayload[]> => {
-    // Use the admin endpoint that lists all users. UserPayload is sufficient for listing.
-    // Access to this endpoint is controlled by backend authorization ('admin' role).
-    // Faculty might need a different endpoint or filtered list if they can't see all users.
-    // For now, assuming admin/faculty have access to /users for recipient selection.
     const response = await apiClient.get<{data: UserPayload[]}>('/users'); 
     return response.data.data;
 };
 
 
 const messageFormSchema = z.object({
-  receiverId: z.string().optional().nullable(), // Keep as string for Select component, convert later
+  receiverId: z.string().optional().nullable(), 
   subject: z.string().min(3, "Subject must be at least 3 characters").max(100),
   content: z.string().min(10, "Message content must be at least 10 characters").max(2000),
   type: z.enum(['Direct', 'Broadcast']),
@@ -59,7 +54,6 @@ export default function MessagesPage() {
     queryFn: fetchMessages,
   });
 
-  // Only fetch users if admin/faculty for composing messages
   const { data: usersForSelect, isLoading: usersLoading } = useQuery<UserPayload[], Error>({
     queryKey: ['usersForMessagingList'],
     queryFn: fetchUsersForMessaging,
@@ -122,7 +116,7 @@ export default function MessagesPage() {
 
   const handleViewMessage = (message: Message) => {
     setSelectedMessage(message);
-    if (!message.isRead && (message.receiverId === user?.id || message.type === 'Broadcast')) { // Also mark broadcast as "read" visually for current user locally
+    if (!message.isRead && (message.receiverId === user?.id || message.type === 'Broadcast')) {
       markAsReadMutation.mutate(message.id);
     }
   };
@@ -175,7 +169,7 @@ export default function MessagesPage() {
                 {error && <div className="text-destructive bg-destructive/10 p-3 rounded-md flex items-center"><AlertCircle className="mr-2 h-5 w-5" /> Error: {error.message}</div>}
                 {!isLoading && messages && messages.length === 0 && <p className="text-muted-foreground py-4 text-center">Your inbox is empty.</p>}
                 {!isLoading && messages && messages.length > 0 && (
-                  <ul className="space-y-3 max-h-[60vh] overflow-y-auto pr-2 scrollbar-thin">
+                  <ul className="space-y-3">
                     {messages.map((msg) => (
                       <li key={msg.id} 
                           className={cn(
@@ -193,7 +187,8 @@ export default function MessagesPage() {
                             <span className={`text-xs px-2 py-0.5 rounded-full border ${getPriorityColor(msg.priority)}`}>{msg.priority}</span>
                           </div>
                           <p className="text-xs text-muted-foreground mt-0.5">
-                            From: {msg.sender?.username || 'System'} &bull; {format(new Date(msg.timestamp), "MMM d, yyyy 'at' p")}
+                            {/* The Message model's sender is Partial<User>, which has 'name' */}
+                            From: {msg.sender?.name || 'System'} &bull; {format(new Date(msg.timestamp), "MMM d, yyyy 'at' p")}
                           </p>
                           {selectedMessage?.id === msg.id && (
                               <p className="text-sm text-foreground mt-2 whitespace-pre-wrap">{msg.content}</p>
@@ -251,8 +246,9 @@ export default function MessagesPage() {
                                     <SelectValue placeholder={usersLoading? "Loading users..." : "Select recipient"} />
                                 </SelectTrigger>
                                 <SelectContent>
+                                    {/* usersForSelect contains UserPayload, which has 'name' */}
                                     {usersForSelect?.filter(u => u.id !== user?.id).map(u => ( 
-                                        <SelectItem key={u.id} value={String(u.id)}>{u.username} ({u.role})</SelectItem>
+                                        <SelectItem key={u.id} value={String(u.id)}>{u.name} ({u.role})</SelectItem>
                                     ))}
                                      {!usersLoading && (!usersForSelect || usersForSelect.filter(u => u.id !== user?.id).length === 0) && <p className="p-2 text-xs text-muted-foreground">No users available to message.</p>}
                                 </SelectContent>

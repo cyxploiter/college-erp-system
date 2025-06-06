@@ -1,10 +1,10 @@
 
 'use client';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
-import { Users, UserPlus, AlertCircle, Briefcase, GraduationCap, Loader2, ArrowRight } from 'lucide-react';
+import { Users, UserPlus, Briefcase, GraduationCap, Loader2, ArrowRight, Settings, ShieldCheck } from 'lucide-react'; // Added ShieldCheck for Superuser
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/lib/apiClient';
 import { UserPayload, Department, UserProfileResponse, APIResponse, CreateUserInput, UpdateUserInput } from '@college-erp/common';
@@ -31,14 +31,13 @@ export default function AdminUsersOverviewPage() {
   const { toast } = useToast();
   
   const [isUserFormOpen, setIsUserFormOpen] = useState(false);
-  const [editingUserFullProfile, setEditingUserFullProfile] = useState<UserProfileResponse | null>(null); // Kept for dialog
-  const [isEditingMode, setIsEditingMode] = useState(false); // Kept for dialog
+  const [editingUserFullProfile, setEditingUserFullProfile] = useState<UserProfileResponse | null>(null); 
+  const [isEditingMode, setIsEditingMode] = useState(false); 
   
-  // Deletion state kept for ConfirmationDialog's logic, though not triggered from this page
   const [isConfirmDeleteDialogOpen, setIsConfirmDeleteDialogOpen] = useState(false);
   const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
   
-  const [isFetchingProfileForEdit, setIsFetchingProfileForEdit] = useState(false); // Kept for dialog
+  const [isFetchingProfileForEdit, setIsFetchingProfileForEdit] = useState(false);
 
   const { data: users, isLoading: usersLoading, error: usersError } = useQuery<UserPayload[], Error>({
     queryKey: ['allAdminUsers'],
@@ -51,11 +50,13 @@ export default function AdminUsersOverviewPage() {
   });
 
   const userStats = useMemo(() => {
-    if (!users) return { total: 0, faculty: 0, students: 0 };
+    if (!users) return { total: 0, faculty: 0, students: 0, admins: 0, superusers: 0 };
     return {
       total: users.length,
       faculty: users.filter(u => u.role === 'faculty').length,
       students: users.filter(u => u.role === 'student').length,
+      admins: users.filter(u => u.role === 'admin').length,
+      superusers: users.filter(u => u.role === 'superuser').length, // Added superuser count
     };
   }, [users]);
 
@@ -108,18 +109,52 @@ export default function AdminUsersOverviewPage() {
   
   const onUserFormSubmit = async (values: UserFormValues, isEditingSubmit: boolean) => {
     const departmentIdNumber = values.departmentId ? parseInt(values.departmentId, 10) : null;
+    
+    // Create a base payload from UserFormValues, ensuring all optional fields from the form
+    // are correctly mapped to CreateUserInput/UpdateUserInput.
+    // UserFormValues already contains all necessary fields like program, branch etc.
+    const formPayload = {
+        name: values.name, // Corrected from username
+        email: values.email,
+        profilePictureUrl: values.profilePictureUrl,
+        role: values.role,
+        departmentId: departmentIdNumber,
+        // Student fields
+        program: values.role === 'student' ? values.program : undefined,
+        branch: values.role === 'student' ? values.branch : undefined,
+        expectedGraduationYear: values.role === 'student' ? values.expectedGraduationYear : undefined,
+        currentYearOfStudy: values.role === 'student' ? values.currentYearOfStudy : undefined,
+        gpa: values.role === 'student' ? values.gpa : undefined,
+        academicStatus: values.role === 'student' ? values.academicStatus : undefined,
+        fatherName: values.role === 'student' ? values.fatherName : undefined,
+        motherName: values.role === 'student' ? values.motherName : undefined,
+        dateOfBirth: values.role === 'student' ? values.dateOfBirth : undefined,
+        phoneNumber: values.role === 'student' ? values.phoneNumber : undefined,
+        permanentAddress: values.role === 'student' ? values.permanentAddress : undefined,
+        currentAddress: values.role === 'student' ? values.currentAddress : undefined,
+        // Faculty fields
+        officeNumber: values.role === 'faculty' ? values.officeNumber : undefined,
+        specialization: values.role === 'faculty' ? values.specialization : undefined,
+        // Admin fields
+        permissionLevel: values.role === 'admin' ? values.permissionLevel : undefined,
+        // Superuser fields
+        superuserPermissions: values.role === 'superuser' ? values.superuserPermissions : undefined,
+    };
+
 
     if (isEditingSubmit && editingUserFullProfile) {
       const updatePayload: UpdateUserInput = {
-        username: values.username,
-        email: values.email,
-        role: values.role, 
-        departmentId: departmentIdNumber, 
-        major: values.role === 'student' ? values.major : undefined,
-        officeNumber: values.role === 'faculty' ? values.officeNumber : undefined,
-        specialization: values.role === 'faculty' ? values.specialization : undefined,
-        permissionLevel: values.role === 'admin' ? values.permissionLevel : undefined,
+        ...formPayload
+        // Password is not included here, UserFormDialog handles optional password update
       };
+      if (values.password && values.password.trim() !== '') {
+        // This scenario (sending password on update) is not directly supported by current UpdateUserInput
+        // and backend userService.updateUserById. Typically password updates are separate.
+        // For now, we assume password is not updated here, or UserFormDialog logic needs to be enhanced
+        // and backend needs a dedicated password change endpoint or logic.
+        // If password needs to be updated, it should be handled carefully.
+        // The current `UserFormDialog` correctly omits password if it's blank during edit.
+      }
       await updateUserMutation.mutateAsync({ userId: editingUserFullProfile.id, data: updatePayload });
     } else {
       if (!values.password) { 
@@ -127,15 +162,8 @@ export default function AdminUsersOverviewPage() {
         return;
       }
       const createPayload: CreateUserInput = {
-        username: values.username,
-        email: values.email,
+        ...formPayload,
         password_DO_NOT_USE_THIS_FIELD_EVER_EXCEPT_ON_CREATE_ONLY: values.password,
-        role: values.role,
-        departmentId: departmentIdNumber,
-        major: values.role === 'student' ? values.major : undefined,
-        officeNumber: values.role === 'faculty' ? values.officeNumber : undefined,
-        specialization: values.role === 'faculty' ? values.specialization : undefined,
-        permissionLevel: values.role === 'admin' ? values.permissionLevel : undefined,
       };
       await createUserMutation.mutateAsync(createPayload);
     }
@@ -193,12 +221,12 @@ export default function AdminUsersOverviewPage() {
   };
 
   return (
-    <ProtectedRoute allowedRoles={['admin']}>
+    <ProtectedRoute allowedRoles={['admin', 'superuser']}> {/* Allow superuser to see this page */}
       <div className="space-y-6 sm:space-y-8">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <h1 className="text-2xl sm:text-3xl font-bold text-foreground flex items-center">
                 <Users className="mr-3 h-7 w-7 sm:h-8 sm:w-8 text-primary" />
-                User Overview
+                User Management Overview
             </h1>
             <Button onClick={handleOpenAddUserDialog} disabled={createUserMutation.isPending || updateUserMutation.isPending}>
                 <UserPlus className="mr-2 h-4 w-4" /> Add New User
@@ -207,11 +235,11 @@ export default function AdminUsersOverviewPage() {
         
         {pageError && (
           <div className="text-destructive bg-destructive/10 p-4 rounded-md flex items-center">
-            <AlertCircle className="h-5 w-5 mr-2"/> Error loading user data: {pageError.message}
+            <Users className="h-5 w-5 mr-2"/> Error loading user data: {pageError.message}
           </div>
         )}
 
-        <div className="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"> {/* Adjusted grid for 5 cards */}
             <StatCard 
                 title="Total Users" 
                 value={userStats.total} 
@@ -235,16 +263,32 @@ export default function AdminUsersOverviewPage() {
                 isLoading={pageIsLoading}
                 linkTo="/admin/users/students"
             />
+             <StatCard 
+                title="Administrators" 
+                value={userStats.admins} 
+                icon={Settings}
+                description="System administrators."
+                isLoading={pageIsLoading}
+                // linkTo="/admin/users/admins" // If a separate admin management page exists
+            />
+            <StatCard 
+                title="Superusers" 
+                value={userStats.superusers} 
+                icon={ShieldCheck} // New icon for superusers
+                description="Top-level system managers."
+                isLoading={pageIsLoading}
+                // No link for superusers for now, managed via general Add User or specific interface if built
+            />
         </div>
 
         <Card className="shadow-md">
           <CardHeader>
             <CardTitle>User Management Hub</CardTitle>
-            <CardDescription>Click on the cards above to navigate to detailed management pages for each user category.</CardDescription>
+            <CardDescription>Navigate to specific user categories using the cards above for detailed management options. Use 'Add New User' for all types.</CardDescription>
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground">
-              This overview provides quick statistics. For detailed lists, editing, and specific actions related to users, faculty, or students, please use the respective linked pages.
+              This overview provides quick statistics. For detailed lists and specific actions related to faculty or students, please use their respective linked pages. The "Add New User" button allows creation of any user type, including Administrators and Superusers.
             </p>
           </CardContent>
         </Card>
@@ -256,7 +300,7 @@ export default function AdminUsersOverviewPage() {
             defaultValues={editingUserFullProfile}
             isEditing={isEditingMode}
             departments={departments || []}
-            isLoading={createUserMutation.isPending || updateUserMutation.isPending || isFetchingProfileForEdit}
+            isLoading={createUserMutation.isPending || updateUserMutation.isPending || isFetchingProfileForEdit || departmentsLoading}
         />
 
         <ConfirmationDialog

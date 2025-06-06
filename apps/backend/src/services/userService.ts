@@ -7,70 +7,42 @@ import {
   StudentDetail,
   FacultyDetail,
   AdminDetail,
+  SuperuserDetail,
   Department,
   UserProfileResponse,
+  CreateUserInput,
+  UpdateUserInput,
 } from "@college-erp/common";
 import { HttpError } from "@/middleware/errorHandler";
 import logger from "@/utils/logger";
 
-export interface CreateUserInput {
-  username: string;
-  email: string;
-  password_DO_NOT_USE_THIS_FIELD_EVER_EXCEPT_ON_CREATE_ONLY: string;
-  role: UserRole;
-  departmentId?: number | null;
-  major?: string;
-  officeNumber?: string;
-  specialization?: string;
-  permissionLevel?: string;
-}
-
-export interface UpdateUserInput {
-  username?: string;
-  email?: string;
-  role?: UserRole;
-  departmentId?: number | null;
-  major?: string;
-  officeNumber?: string;
-  specialization?: string;
-  permissionLevel?: string;
-}
-
-const _determineUserRole = async (userId: number): Promise<UserRole | null> => {
+const _determineUserRole = async (userId: string): Promise<UserRole | null> => {
   if (await get("SELECT userId FROM students WHERE userId = ?", [userId]))
     return "student";
   if (await get("SELECT userId FROM faculty WHERE userId = ?", [userId]))
     return "faculty";
   if (await get("SELECT userId FROM admins WHERE userId = ?", [userId]))
     return "admin";
+  if (await get("SELECT userId FROM superusers WHERE userId = ?", [userId]))
+    return "superuser";
   return null;
 };
 
-// Helper to generate unique random numeric employee ID
-const generateUniqueEmployeeId = async (
+const generateUniqueIdLogic = async (
   prefix: string,
-  length: number,
-  tableName: string,
-  columnName: string
+  numNumericDigits: number
 ): Promise<string> => {
   let id;
   let isUnique = false;
-  const maxAttempts = 10;
+  const maxAttempts = 50;
   let attempts = 0;
   while (!isUnique && attempts < maxAttempts) {
-    // Generate a random number string of (length - prefix.length) digits
-    const randomSuffix = Math.floor(
-      Math.pow(10, length - prefix.length - 1) +
-        Math.random() *
-          (Math.pow(10, length - prefix.length) -
-            Math.pow(10, length - prefix.length - 1) -
-            1)
-    ).toString();
+    let randomSuffix = "";
+    for (let i = 0; i < numNumericDigits; i++) {
+      randomSuffix += Math.floor(Math.random() * 10).toString();
+    }
     id = `${prefix}${randomSuffix}`;
-    const existing = await get(
-      `SELECT 1 FROM ${tableName} WHERE ${columnName} = ?`,
-      [id]
-    );
+    const existing = await get("SELECT 1 FROM users WHERE id = ?", [id]); // Check in users.id
     if (!existing) {
       isUnique = true;
     }
@@ -78,19 +50,32 @@ const generateUniqueEmployeeId = async (
   }
   if (!isUnique) {
     throw new HttpError(
-      `Failed to generate unique ${columnName} for ${tableName} after ${maxAttempts} attempts.`,
+      `Failed to generate unique ID for users table with prefix ${prefix} after ${maxAttempts} attempts.`,
       500
     );
   }
   return id!;
 };
 
+const generateStudentId = async (): Promise<string> => {
+  return generateUniqueIdLogic("2025", 6); // Example student ID logic: 2025 + 6 random digits
+};
+const generateFacultyId = async (): Promise<string> => {
+  return generateUniqueIdLogic("F", 4);
+};
+const generateAdminId = async (): Promise<string> => {
+  return generateUniqueIdLogic("A", 4);
+};
+const generateSuperuserId = async (): Promise<string> => {
+  return generateUniqueIdLogic("SU", 4);
+};
+
 export const getUserProfileById = async (
-  userId: number
+  userId: string
 ): Promise<UserProfileResponse> => {
   logger.debug(`Fetching profile for user ID: ${userId}`);
   const user = await get<User & { deptName?: string }>(
-    `SELECT u.*, d.name as deptName 
+    `SELECT u.id, u.name, u.email, u.profilePictureUrl, u.departmentId, u.createdAt, u.updatedAt, d.name as deptName 
      FROM users u 
      LEFT JOIN departments d ON u.departmentId = d.id 
      WHERE u.id = ?`,
@@ -105,51 +90,73 @@ export const getUserProfileById = async (
   const role = await _determineUserRole(user.id);
   if (!role) {
     logger.error(
-      `User profile fetch failed: Role not found for user ${user.username} (ID: ${user.id}).`
+      `User profile fetch failed: Role not found for user ${user.name} (ID: ${user.id}).`
     );
     throw new HttpError("User account is not fully configured.", 500);
   }
 
-  let studentDetails: StudentDetail | undefined;
+  // Omit userId from detail types as it's redundant with user.id
+  let studentDetails: Omit<StudentDetail, "userId"> | undefined;
   let facultyDetails:
-    | (FacultyDetail & { facultyDeptName?: string })
+    | (Omit<FacultyDetail, "userId" | "departmentId"> & {
+        departmentId?: number;
+        facultyDeptName?: string;
+      })
     | undefined;
-  let adminDetails: AdminDetail | undefined;
+  let adminDetails: Omit<AdminDetail, "userId"> | undefined;
+  let superuserDetails: Omit<SuperuserDetail, "userId"> | undefined;
   let facultyDepartment: Department | undefined;
 
   if (role === "student") {
-    studentDetails = await get<StudentDetail>(
-      "SELECT * FROM students WHERE userId = ?",
+    studentDetails = await get<Omit<StudentDetail, "userId">>(
+      "SELECT id, enrollmentDate, program, branch, expectedGraduationYear, currentYearOfStudy, gpa, academicStatus, fatherName, motherName, dateOfBirth, phoneNumber, permanentAddress, currentAddress, createdAt, updatedAt FROM students WHERE userId = ?",
       [userId]
     );
   } else if (role === "faculty") {
-    facultyDetails = await get<FacultyDetail & { facultyDeptName?: string }>(
-      `SELECT f.*, d.name as facultyDeptName 
+    const facultyDbResult = await get<
+      FacultyDetail & { facultyDeptName?: string }
+    >( // FacultyDetail still has departmentId
+      `SELECT f.id, f.departmentId, f.officeNumber, f.specialization, f.createdAt, f.updatedAt, d.name as facultyDeptName 
          FROM faculty f
          JOIN departments d ON f.departmentId = d.id
          WHERE f.userId = ?`,
       [userId]
     );
-    if (facultyDetails) {
+    if (facultyDbResult) {
+      facultyDetails = {
+        id: facultyDbResult.id,
+        officeNumber: facultyDbResult.officeNumber,
+        specialization: facultyDbResult.specialization,
+        createdAt: facultyDbResult.createdAt,
+        updatedAt: facultyDbResult.updatedAt,
+        facultyDeptName: facultyDbResult.facultyDeptName,
+        departmentId: facultyDbResult.departmentId, // Keep original departmentId from faculty table
+      };
       facultyDepartment = {
-        id: facultyDetails.departmentId,
-        name: facultyDetails.facultyDeptName || "N/A",
+        id: facultyDbResult.departmentId,
+        name: facultyDbResult.facultyDeptName || "N/A",
         createdAt: "",
         updatedAt: "",
       };
     }
   } else if (role === "admin") {
-    adminDetails = await get<AdminDetail>(
-      "SELECT * FROM admins WHERE userId = ?",
+    adminDetails = await get<Omit<AdminDetail, "userId">>(
+      "SELECT id, permissionLevel, createdAt, updatedAt FROM admins WHERE userId = ?",
+      [userId]
+    );
+  } else if (role === "superuser") {
+    superuserDetails = await get<Omit<SuperuserDetail, "userId">>(
+      "SELECT id, permissions, createdAt, updatedAt FROM superusers WHERE userId = ?",
       [userId]
     );
   }
 
   const userProfileResponse: UserProfileResponse = {
     id: user.id,
-    username: user.username,
+    name: user.name,
     role: role,
     email: user.email,
+    profilePictureUrl: user.profilePictureUrl,
     departmentId: user.departmentId,
     department:
       user.departmentId && user.deptName
@@ -163,22 +170,37 @@ export const getUserProfileById = async (
     studentDetails,
     facultyDetails,
     adminDetails,
+    superuserDetails,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
-    // Include the formatted IDs
-    studentRegistrationId:
-      role === "student" ? studentDetails?.studentRegistrationId : undefined,
-    facultyEmployeeId:
-      role === "faculty" ? facultyDetails?.facultyEmployeeId : undefined,
-    adminEmployeeId:
-      role === "admin" ? adminDetails?.adminEmployeeId : undefined,
+    studentRegistrationId: role === "student" ? user.id : undefined,
+    facultyEmployeeId: role === "faculty" ? user.id : undefined,
+    adminEmployeeId: role === "admin" ? user.id : undefined,
+    superuserEmployeeId: role === "superuser" ? user.id : undefined,
+    program: role === "student" ? studentDetails?.program : undefined,
+    branch: role === "student" ? studentDetails?.branch : undefined,
   };
-  if (role === "faculty" && facultyDepartment) {
-    userProfileResponse.department = facultyDepartment;
+
+  // Ensure faculty's primary department (from users table) is correctly set if different from specific faculty table dept (though usually same)
+  if (role === "faculty") {
+    if (facultyDepartment) {
+      // If facultyDetails and thus facultyDepartment were populated
+      userProfileResponse.department = facultyDepartment; // This is the department the faculty BELONGS to
+      userProfileResponse.departmentId = facultyDepartment.id;
+    } else if (user.departmentId && user.deptName) {
+      // Fallback to user's general department if any
+      userProfileResponse.department = {
+        id: user.departmentId,
+        name: user.deptName,
+        createdAt: "",
+        updatedAt: "",
+      };
+      userProfileResponse.departmentId = user.departmentId;
+    }
   }
 
   logger.info(
-    `Profile fetched for user ${user.username} (ID: ${userId}, Role: ${role})`
+    `Profile fetched for user ${user.name} (ID: ${userId}, Role: ${role})`
   );
   return userProfileResponse;
 };
@@ -186,30 +208,71 @@ export const getUserProfileById = async (
 export const createUser = async (
   data: CreateUserInput
 ): Promise<UserPayload> => {
-  logger.info(
-    `Attempting to create user: ${data.username} with role ${data.role}`
-  );
+  logger.info(`Attempting to create user: ${data.name} with role ${data.role}`);
   const {
-    username,
+    name,
     email,
+    profilePictureUrl,
     password_DO_NOT_USE_THIS_FIELD_EVER_EXCEPT_ON_CREATE_ONLY,
     role,
     departmentId,
-    major,
+    program,
+    branch,
+    expectedGraduationYear,
+    currentYearOfStudy,
+    gpa,
+    academicStatus,
+    fatherName,
+    motherName,
+    dateOfBirth,
+    phoneNumber,
+    permanentAddress,
+    currentAddress,
     officeNumber,
     specialization,
     permissionLevel,
+    superuserPermissions,
   } = data;
 
-  const existingUser = await get<User>(
-    "SELECT id FROM users WHERE username = ? OR email = ?",
-    [username, email]
+  const existingUserByEmail = await get<User>(
+    "SELECT id FROM users WHERE email = ?",
+    [email]
   );
-  if (existingUser) {
-    logger.warn(
-      `User creation failed: Username ${username} or email ${email} already exists.`
+  if (existingUserByEmail) {
+    logger.warn(`User creation failed: Email ${email} already exists.`);
+    throw new HttpError("Email already exists.", 409);
+  }
+
+  let newUserId: string;
+  switch (role) {
+    case "student":
+      newUserId = await generateStudentId();
+      break;
+    case "faculty":
+      newUserId = await generateFacultyId();
+      break;
+    case "admin":
+      newUserId = await generateAdminId();
+      break;
+    case "superuser":
+      newUserId = await generateSuperuserId();
+      break;
+    default:
+      throw new HttpError("Invalid role specified for ID generation.", 400);
+  }
+
+  const existingUserById = await get<User>(
+    "SELECT id FROM users WHERE id = ?",
+    [newUserId]
+  );
+  if (existingUserById) {
+    logger.error(
+      `User creation failed: Generated ID ${newUserId} already exists. This should be rare.`
     );
-    throw new HttpError("Username or email already exists.", 409);
+    throw new HttpError(
+      "Failed to generate a unique user ID. Please try again.",
+      500
+    );
   }
 
   const passwordHash = await bcrypt.hash(
@@ -217,75 +280,71 @@ export const createUser = async (
     10
   );
 
-  const userResult = await run(
-    "INSERT INTO users (username, email, passwordHash, departmentId) VALUES (?, ?, ?, ?)",
-    [username, email, passwordHash, role === "faculty" ? null : departmentId]
-  );
-  const newUserId = userResult.lastID;
+  // For faculty, departmentId is mandatory for their faculty role, and also set in users table.
+  // For other roles, departmentId in users table is optional.
+  const userDepartmentIdForUsersTable =
+    role === "faculty" && departmentId ? departmentId : departmentId || null;
 
-  if (!newUserId) {
-    logger.error(
-      `User creation failed for ${username}, no lastID returned from users table insertion.`
-    );
-    throw new HttpError("Failed to create user base record.", 500);
-  }
+  await run(
+    "INSERT INTO users (id, name, email, passwordHash, profilePictureUrl, departmentId) VALUES (?, ?, ?, ?, ?, ?)",
+    [
+      newUserId,
+      name,
+      email,
+      passwordHash,
+      profilePictureUrl,
+      userDepartmentIdForUsersTable,
+    ]
+  );
 
   try {
     if (role === "student") {
-      // Generate studentRegistrationId based on student's own auto-incremented ID
-      const studentInsertResult = await run(
-        "INSERT INTO students (userId, studentRegistrationId, major, enrollmentDate) VALUES (?, ?, ?, ?)",
-        [newUserId, "TEMP_ID", major, new Date().toISOString()]
-      ); // Insert with a temporary ID
-      const studentId = studentInsertResult.lastID;
-      const studentRegistrationId = `2025${studentId
-        .toString()
-        .padStart(6, "0")}`;
-      await run("UPDATE students SET studentRegistrationId = ? WHERE id = ?", [
-        studentRegistrationId,
-        studentId,
-      ]);
-      logger.info(
-        `Student ${username} created with studentRegistrationId ${studentRegistrationId}.`
-      );
-    } else if (role === "faculty") {
-      if (!departmentId)
-        throw new HttpError("Department ID is required for faculty.", 400);
-      const facultyEmployeeId = await generateUniqueEmployeeId(
-        "1",
-        5,
-        "faculty",
-        "facultyEmployeeId"
-      );
       await run(
-        "INSERT INTO faculty (userId, facultyEmployeeId, departmentId, officeNumber, specialization) VALUES (?, ?, ?, ?, ?)",
+        `INSERT INTO students (userId, enrollmentDate, program, branch, 
+                               expectedGraduationYear, currentYearOfStudy, gpa, academicStatus, 
+                               fatherName, motherName, dateOfBirth, phoneNumber, permanentAddress, currentAddress) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           newUserId,
-          facultyEmployeeId,
-          departmentId,
-          officeNumber,
-          specialization,
+          new Date().toISOString(),
+          program,
+          branch,
+          expectedGraduationYear,
+          currentYearOfStudy,
+          gpa,
+          academicStatus,
+          fatherName,
+          motherName,
+          dateOfBirth,
+          phoneNumber,
+          permanentAddress,
+          currentAddress,
         ]
       );
-      logger.info(
-        `Faculty ${username} created with facultyEmployeeId ${facultyEmployeeId}.`
-      );
-    } else if (role === "admin") {
-      const adminEmployeeId = await generateUniqueEmployeeId(
-        "2",
-        5,
-        "admins",
-        "adminEmployeeId"
-      );
+      logger.info(`Student ${name} created with userId ${newUserId}.`);
+    } else if (role === "faculty") {
+      if (!departmentId)
+        throw new HttpError(
+          "Department ID is required for faculty role details.",
+          400
+        );
       await run(
-        "INSERT INTO admins (userId, adminEmployeeId, permissionLevel) VALUES (?, ?, ?)",
-        [newUserId, adminEmployeeId, permissionLevel]
+        "INSERT INTO faculty (userId, departmentId, officeNumber, specialization) VALUES (?, ?, ?, ?)",
+        [newUserId, departmentId, officeNumber, specialization]
       );
-      logger.info(
-        `Admin ${username} created with adminEmployeeId ${adminEmployeeId}.`
-      );
-    } else {
-      throw new HttpError("Invalid role specified.", 400);
+      logger.info(`Faculty ${name} created with userId ${newUserId}.`);
+    } else if (role === "admin") {
+      await run("INSERT INTO admins (userId, permissionLevel) VALUES (?, ?)", [
+        newUserId,
+        permissionLevel,
+      ]);
+      logger.info(`Admin ${name} created with userId ${newUserId}.`);
+    } else if (role === "superuser") {
+      await run("INSERT INTO superusers (userId, permissions) VALUES (?, ?)", [
+        newUserId,
+        superuserPermissions || "{}",
+      ]);
+      logger.info(`Superuser ${name} created with userId ${newUserId}.`);
     }
   } catch (roleError) {
     await run("DELETE FROM users WHERE id = ?", [newUserId]);
@@ -297,54 +356,82 @@ export const createUser = async (
     throw roleError;
   }
 
+  let studentProgramPayload: string | undefined;
+  let studentBranchPayload: string | undefined;
+  if (role === "student") {
+    studentProgramPayload = program;
+    studentBranchPayload = branch;
+  }
+
   const newUserPayload: UserPayload = {
     id: newUserId,
-    username,
+    name,
     email,
+    profilePictureUrl,
     role,
-    departmentId: role === "faculty" ? departmentId : departmentId || null,
+    departmentId: userDepartmentIdForUsersTable,
+    studentRegistrationId: role === "student" ? newUserId : undefined,
+    program: studentProgramPayload,
+    branch: studentBranchPayload,
   };
   logger.info(
-    `User ${username} created successfully with ID ${newUserId} and role ${role}.`
+    `User ${name} created successfully with ID ${newUserId} and role ${role}.`
   );
   return newUserPayload;
 };
 
 export const getAllUsers = async (): Promise<UserPayload[]> => {
   logger.debug("Fetching all users for admin view.");
-  const usersWithRoles = await all<User & { role: UserRole }>(`
+  const usersWithDetails = await all<
+    User & {
+      roleFromDb: UserRole;
+      studentProgram?: string;
+      studentBranch?: string;
+    }
+  >(`
     SELECT
-      u.id, u.username, u.email, u.departmentId, u.createdAt, u.updatedAt,
+      u.id, u.name, u.email, u.profilePictureUrl, u.departmentId, u.createdAt, u.updatedAt,
       COALESCE(
+        CASE WHEN su.userId IS NOT NULL THEN 'superuser' END,
         CASE WHEN s.userId IS NOT NULL THEN 'student' END,
         CASE WHEN f.userId IS NOT NULL THEN 'faculty' END,
         CASE WHEN a.userId IS NOT NULL THEN 'admin' END
-      ) as role
+      ) as roleFromDb, -- aliased to avoid conflict with a potential 'role' column in User if not careful
+      s.program as studentProgram,
+      s.branch as studentBranch
     FROM users u
     LEFT JOIN students s ON u.id = s.userId
     LEFT JOIN faculty f ON u.id = f.userId
     LEFT JOIN admins a ON u.id = a.userId
-    ORDER BY u.id ASC
+    LEFT JOIN superusers su ON u.id = su.userId
+    ORDER BY u.name ASC -- Changed from u.id ASC as ID is string now
   `);
 
-  return usersWithRoles.map((user) => ({
+  return usersWithDetails.map((user) => ({
     id: user.id,
-    username: user.username,
-    role: user.role,
+    name: user.name,
+    role: user.roleFromDb,
     email: user.email,
+    profilePictureUrl: user.profilePictureUrl,
     departmentId: user.departmentId,
+    studentRegistrationId: user.roleFromDb === "student" ? user.id : undefined,
+    program: user.roleFromDb === "student" ? user.studentProgram : undefined,
+    branch: user.roleFromDb === "student" ? user.studentBranch : undefined,
   }));
 };
 
 export const getUserById = async (
-  userId: number
+  userId: string
 ): Promise<UserPayload | null> => {
   logger.debug(`Admin fetching user by ID: ${userId}`);
-  const user = await get<User>(
-    "SELECT id, username, email, departmentId, createdAt, updatedAt FROM users WHERE id = ?",
+  // This function returns UserPayload, so it needs role and potentially student program/branch.
+  // We can reuse the logic from getAllUsers for a single user or call determineUserRole.
+  const userBasic = await get<User>(
+    `SELECT u.id, u.name, u.email, u.profilePictureUrl, u.departmentId FROM users u WHERE u.id = ?`,
     [userId]
   );
-  if (!user) {
+
+  if (!userBasic) {
     logger.warn(`Admin fetch: User not found for ID: ${userId}`);
     return null;
   }
@@ -353,48 +440,67 @@ export const getUserById = async (
     logger.warn(`Admin fetch: Role not found for user ID: ${userId}.`);
     return null;
   }
+
+  let studentProgram: string | undefined;
+  let studentBranch: string | undefined;
+  if (role === "student") {
+    const studentData = await get<{ program?: string; branch?: string }>(
+      "SELECT program, branch FROM students WHERE userId = ?",
+      [userId]
+    );
+    studentProgram = studentData?.program;
+    studentBranch = studentData?.branch;
+  }
+
   return {
-    id: user.id,
-    username: user.username,
+    id: userBasic.id,
+    name: userBasic.name,
     role: role,
-    email: user.email,
-    departmentId: user.departmentId,
+    email: userBasic.email,
+    profilePictureUrl: userBasic.profilePictureUrl,
+    departmentId: userBasic.departmentId,
+    studentRegistrationId: role === "student" ? userBasic.id : undefined,
+    program: studentProgram,
+    branch: studentBranch,
   };
 };
 
 export const updateUserById = async (
-  userId: number,
+  userId: string,
   data: UpdateUserInput
 ): Promise<UserPayload> => {
-  logger.info(
-    `Attempting to update user ID: ${userId} with data: ${JSON.stringify(data)}`
-  );
+  logger.info(`Attempting to update user ID: ${userId}`);
 
-  const currentUserState = await getUserById(userId);
-  if (!currentUserState) {
+  const currentUserProfile = await getUserProfileById(userId);
+  if (!currentUserProfile) {
     throw new HttpError("User not found.", 404);
   }
+  const currentRole = currentUserProfile.role; // This is the original role, cannot be changed.
 
   const {
-    username,
+    name,
     email,
-    role: newRole,
+    profilePictureUrl,
     departmentId,
-    major,
+    program,
+    branch,
+    expectedGraduationYear,
+    currentYearOfStudy,
+    gpa,
+    academicStatus,
+    fatherName,
+    motherName,
+    dateOfBirth,
+    phoneNumber,
+    permanentAddress,
+    currentAddress,
     officeNumber,
     specialization,
     permissionLevel,
+    superuserPermissions,
   } = data;
 
-  if (username && username !== currentUserState.username) {
-    const existingUserByUsername = await get<User>(
-      "SELECT id FROM users WHERE username = ? AND id != ?",
-      [username, userId]
-    );
-    if (existingUserByUsername)
-      throw new HttpError("Username already taken.", 409);
-  }
-  if (email && email !== currentUserState.email) {
+  if (email && email !== currentUserProfile.email) {
     const existingUserByEmail = await get<User>(
       "SELECT id FROM users WHERE email = ? AND id != ?",
       [email, userId]
@@ -403,22 +509,25 @@ export const updateUserById = async (
   }
 
   const fieldsToUpdateUsers: string[] = [];
-  const valuesUsers: (string | number | null)[] = [];
+  const valuesUsers: (string | number | null | undefined)[] = [];
 
-  if (username !== undefined) {
-    fieldsToUpdateUsers.push("username = ?");
-    valuesUsers.push(username);
+  if (name !== undefined) {
+    fieldsToUpdateUsers.push("name = ?");
+    valuesUsers.push(name);
   }
   if (email !== undefined) {
     fieldsToUpdateUsers.push("email = ?");
     valuesUsers.push(email);
   }
+  if (profilePictureUrl !== undefined) {
+    fieldsToUpdateUsers.push("profilePictureUrl = ?");
+    valuesUsers.push(profilePictureUrl);
+  }
 
-  if (
-    departmentId !== undefined &&
-    newRole !== "faculty" &&
-    (!newRole || newRole === currentUserState.role)
-  ) {
+  // Update departmentId in users table only if role is NOT faculty.
+  // For faculty, their primary department association is managed in the faculty table.
+  // And users.departmentId also gets updated specifically for faculty.
+  if (departmentId !== undefined && currentRole !== "faculty") {
     fieldsToUpdateUsers.push("departmentId = ?");
     valuesUsers.push(departmentId);
   }
@@ -431,109 +540,115 @@ export const updateUserById = async (
     await run(sql, valuesUsers);
   }
 
-  if (newRole && newRole !== currentUserState.role) {
-    logger.info(
-      `Changing role for user ${userId} from ${currentUserState.role} to ${newRole}`
+  // Role change is not supported in this path (data.role is not used for update logic here)
+  // Update role-specific tables
+  if (currentRole === "student") {
+    const fields: string[] = [],
+      values: any[] = [];
+    if (program !== undefined) {
+      fields.push("program = ?");
+      values.push(program);
+    }
+    if (branch !== undefined) {
+      fields.push("branch = ?");
+      values.push(branch);
+    }
+    if (expectedGraduationYear !== undefined) {
+      fields.push("expectedGraduationYear = ?");
+      values.push(expectedGraduationYear);
+    }
+    if (currentYearOfStudy !== undefined) {
+      fields.push("currentYearOfStudy = ?");
+      values.push(currentYearOfStudy);
+    }
+    if (gpa !== undefined) {
+      fields.push("gpa = ?");
+      values.push(gpa);
+    }
+    if (academicStatus !== undefined) {
+      fields.push("academicStatus = ?");
+      values.push(academicStatus);
+    }
+    if (fatherName !== undefined) {
+      fields.push("fatherName = ?");
+      values.push(fatherName);
+    }
+    if (motherName !== undefined) {
+      fields.push("motherName = ?");
+      values.push(motherName);
+    }
+    if (dateOfBirth !== undefined) {
+      fields.push("dateOfBirth = ?");
+      values.push(dateOfBirth);
+    }
+    if (phoneNumber !== undefined) {
+      fields.push("phoneNumber = ?");
+      values.push(phoneNumber);
+    }
+    if (permanentAddress !== undefined) {
+      fields.push("permanentAddress = ?");
+      values.push(permanentAddress);
+    }
+    if (currentAddress !== undefined) {
+      fields.push("currentAddress = ?");
+      values.push(currentAddress);
+    }
+    if (fields.length > 0) {
+      values.push(userId);
+      await run(
+        `UPDATE students SET ${fields.join(
+          ", "
+        )}, updatedAt = CURRENT_TIMESTAMP WHERE userId = ?`,
+        values
+      );
+    }
+  } else if (currentRole === "faculty") {
+    const fields: string[] = [],
+      values: any[] = [];
+    // For faculty, departmentId update affects both faculty table and users table
+    if (departmentId !== undefined) {
+      fields.push("departmentId = ?");
+      values.push(departmentId);
+      // Also update the users.departmentId for faculty to keep them in sync
+      await run(
+        "UPDATE users SET departmentId = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?",
+        [departmentId, userId]
+      );
+    }
+    if (officeNumber !== undefined) {
+      fields.push("officeNumber = ?");
+      values.push(officeNumber);
+    }
+    if (specialization !== undefined) {
+      fields.push("specialization = ?");
+      values.push(specialization);
+    }
+    if (fields.length > 0) {
+      values.push(userId);
+      await run(
+        `UPDATE faculty SET ${fields.join(
+          ", "
+        )}, updatedAt = CURRENT_TIMESTAMP WHERE userId = ?`,
+        values
+      );
+    }
+  } else if (currentRole === "admin" && permissionLevel !== undefined) {
+    await run(
+      "UPDATE admins SET permissionLevel = ?, updatedAt = CURRENT_TIMESTAMP WHERE userId = ?",
+      [permissionLevel, userId]
     );
-    if (currentUserState.role === "student")
-      await run("DELETE FROM students WHERE userId = ?", [userId]);
-    else if (currentUserState.role === "faculty")
-      await run("DELETE FROM faculty WHERE userId = ?", [userId]);
-    else if (currentUserState.role === "admin")
-      await run("DELETE FROM admins WHERE userId = ?", [userId]);
-
-    // Re-create role specific entry with new details
-    if (newRole === "student") {
-      const studentInsertResult = await run(
-        "INSERT INTO students (userId, studentRegistrationId, major) VALUES (?, ?, ?)",
-        [userId, "TEMP_ID", major || null]
-      );
-      const studentId = studentInsertResult.lastID;
-      const studentRegistrationId = `2025${studentId
-        .toString()
-        .padStart(6, "0")}`;
-      await run("UPDATE students SET studentRegistrationId = ? WHERE id = ?", [
-        studentRegistrationId,
-        studentId,
-      ]);
-    } else if (newRole === "faculty") {
-      if (departmentId === undefined || departmentId === null)
-        throw new HttpError(
-          "Department ID is required when changing role to faculty.",
-          400
-        );
-      const facultyEmployeeId = await generateUniqueEmployeeId(
-        "1",
-        5,
-        "faculty",
-        "facultyEmployeeId"
-      );
-      await run(
-        "INSERT INTO faculty (userId, facultyEmployeeId, departmentId, officeNumber, specialization) VALUES (?, ?, ?, ?, ?)",
-        [
-          userId,
-          facultyEmployeeId,
-          departmentId,
-          officeNumber || null,
-          specialization || null,
-        ]
-      );
-    } else if (newRole === "admin") {
-      const adminEmployeeId = await generateUniqueEmployeeId(
-        "2",
-        5,
-        "admins",
-        "adminEmployeeId"
-      );
-      await run(
-        "INSERT INTO admins (userId, adminEmployeeId, permissionLevel) VALUES (?, ?, ?)",
-        [userId, adminEmployeeId, permissionLevel || null]
-      );
-    }
-  } else {
-    // Update existing role-specific details if role is not changing
-    if (currentUserState.role === "student" && major !== undefined) {
-      await run(
-        "UPDATE students SET major = ?, updatedAt = CURRENT_TIMESTAMP WHERE userId = ?",
-        [major, userId]
-      );
-    } else if (currentUserState.role === "faculty") {
-      const fieldsToUpdateFaculty: string[] = [];
-      const valuesFaculty: (string | number | null)[] = [];
-      if (departmentId !== undefined) {
-        fieldsToUpdateFaculty.push("departmentId = ?");
-        valuesFaculty.push(departmentId);
-      }
-      if (officeNumber !== undefined) {
-        fieldsToUpdateFaculty.push("officeNumber = ?");
-        valuesFaculty.push(officeNumber);
-      }
-      if (specialization !== undefined) {
-        fieldsToUpdateFaculty.push("specialization = ?");
-        valuesFaculty.push(specialization);
-      }
-      if (fieldsToUpdateFaculty.length > 0) {
-        valuesFaculty.push(userId);
-        await run(
-          `UPDATE faculty SET ${fieldsToUpdateFaculty.join(
-            ", "
-          )}, updatedAt = CURRENT_TIMESTAMP WHERE userId = ?`,
-          valuesFaculty
-        );
-      }
-    } else if (
-      currentUserState.role === "admin" &&
-      permissionLevel !== undefined
-    ) {
-      await run(
-        "UPDATE admins SET permissionLevel = ?, updatedAt = CURRENT_TIMESTAMP WHERE userId = ?",
-        [permissionLevel, userId]
-      );
-    }
+  } else if (
+    currentRole === "superuser" &&
+    superuserPermissions !== undefined
+  ) {
+    await run(
+      "UPDATE superusers SET permissions = ?, updatedAt = CURRENT_TIMESTAMP WHERE userId = ?",
+      [superuserPermissions, userId]
+    );
   }
 
-  const updatedUser = await getUserById(userId);
-  if (!updatedUser) {
+  const updatedUserPayload = await getUserById(userId);
+  if (!updatedUserPayload) {
     logger.error(
       `Failed to retrieve updated user details for ID: ${userId} post-update.`
     );
@@ -543,12 +658,12 @@ export const updateUserById = async (
     );
   }
   logger.info(
-    `User ID: ${userId} updated successfully to role ${updatedUser.role}.`
+    `User ID: ${userId} updated successfully. Current role ${updatedUserPayload.role}.`
   );
-  return updatedUser;
+  return updatedUserPayload;
 };
 
-export const deleteUserById = async (userId: number): Promise<void> => {
+export const deleteUserById = async (userId: string): Promise<void> => {
   logger.info(`Attempting to delete user ID: ${userId}`);
   const user = await get<User>("SELECT id FROM users WHERE id = ?", [userId]);
   if (!user) {
@@ -556,6 +671,7 @@ export const deleteUserById = async (userId: number): Promise<void> => {
     throw new HttpError("User not found.", 404);
   }
 
+  // Deleting from users table will cascade to role-specific tables
   const result = await run("DELETE FROM users WHERE id = ?", [userId]);
   if (result.changes === 0) {
     logger.warn(
@@ -563,7 +679,7 @@ export const deleteUserById = async (userId: number): Promise<void> => {
     );
   }
   logger.info(
-    `User ID: ${userId} deleted successfully. Corresponding role entries (if any) also deleted via cascade.`
+    `User ID: ${userId} deleted successfully. Corresponding role entries also deleted via cascade.`
   );
 };
 

@@ -7,56 +7,41 @@ import {
   Course,
   Semester,
   Section,
+  User,
 } from "@college-erp/common";
 
 // Declare Node.js globals for TypeScript
 declare const require: any;
 declare const module: any;
 
-// Helper to get start of next week for schedule seeding
 const getStartOfWeekISO = (date: Date, dayOfWeek: number) => {
-  // 0=Sunday, 1=Monday
   const d = new Date(date);
   const currentDay = d.getDay();
   const diff =
-    d.getDate() - currentDay + (currentDay === 0 ? -6 : 1) + dayOfWeek; // Adjust to make Monday the first day for calculation if needed
+    d.getDate() - currentDay + (currentDay === 0 ? -6 : 1) + dayOfWeek;
   d.setDate(diff);
   d.setHours(0, 0, 0, 0);
   return d;
 };
 
-const generateUniqueEmployeeId = async (
+const generateUniqueIdWithNumericSuffix = async (
   prefix: string,
-  length: number,
-  tableName: string,
-  columnName: string
+  numNumericDigits: number
 ): Promise<string> => {
   let id;
   let isUnique = false;
-  const maxAttempts = 10; // Prevent infinite loops
+  const maxAttempts = 50; // Increased attempts for potentially denser ID space
   let attempts = 0;
 
   while (!isUnique && attempts < maxAttempts) {
-    // Generates a random suffix such that the total ID length (prefix + suffix) is `length`.
-    // Assumes prefix is a single digit for this specific random number generation logic.
-    const numSuffixDigits = length - prefix.length;
-    if (numSuffixDigits <= 0) {
-      throw new Error(
-        `Cannot generate suffix for prefix "${prefix}" and total length ${length}.`
-      );
+    let randomSuffix = "";
+    for (let i = 0; i < numNumericDigits; i++) {
+      randomSuffix += Math.floor(Math.random() * 10).toString();
     }
-    const randomSuffix = Math.floor(
-      Math.pow(10, numSuffixDigits - 1) +
-        Math.random() *
-          (Math.pow(10, numSuffixDigits) -
-            Math.pow(10, numSuffixDigits - 1) -
-            1)
-    ).toString();
     id = `${prefix}${randomSuffix}`;
-    const existing = await get(
-      `SELECT 1 FROM ${tableName} WHERE ${columnName} = ?`,
-      [id]
-    );
+
+    // Check uniqueness in users.id table
+    const existing = await get("SELECT 1 FROM users WHERE id = ?", [id]);
     if (!existing) {
       isUnique = true;
     }
@@ -64,22 +49,49 @@ const generateUniqueEmployeeId = async (
   }
   if (!isUnique) {
     throw new Error(
-      `Failed to generate unique ${columnName} for ${tableName} after ${maxAttempts} attempts.`
+      `Failed to generate unique ID for users table with prefix ${prefix} after ${maxAttempts} attempts.`
     );
   }
   return id!;
+};
+
+const generateUniqueStudentId = async (): Promise<string> => {
+  // For students, ID format is '2025' + 6 digits.
+  // We need to ensure the 6-digit part is unique enough to avoid collisions in users.id.
+  let studentId;
+  let isUnique = false;
+  const maxAttempts = 50;
+  let attempts = 0;
+  while (!isUnique && attempts < maxAttempts) {
+    let randomSuffix = "";
+    for (let i = 0; i < 6; i++) {
+      randomSuffix += Math.floor(Math.random() * 10).toString();
+    }
+    studentId = `2025${randomSuffix}`;
+    const existing = await get("SELECT 1 FROM users WHERE id = ?", [studentId]);
+    if (!existing) {
+      isUnique = true;
+    }
+    attempts++;
+  }
+  if (!isUnique) {
+    throw new Error(
+      `Failed to generate unique student ID for users table after ${maxAttempts} attempts.`
+    );
+  }
+  return studentId!;
 };
 
 const seedDatabase = async () => {
   logger.info("Starting database seeding...");
 
   try {
-    // 1. Seed Departments
     const departmentNames = [
       "Computer Science",
       "Mathematics",
       "Physics",
       "History",
+      "General Administration",
     ];
     const departmentIds: { [name: string]: number } = {};
     for (const name of departmentNames) {
@@ -101,174 +113,222 @@ const seedDatabase = async () => {
       }
     }
 
-    // 2. Seed Users (Admin, Students, Faculty)
     const usersToSeed = [
       {
-        username: "admin",
+        name: "Super User",
+        password: "password123",
+        email: "superuser@example.com",
+        profilePictureUrl: null,
+        role: "superuser" as UserRole,
+        departmentName: null,
+        permissions: JSON.stringify({ canManageAll: true }),
+      },
+      {
+        name: "Admin User",
         password: "password123",
         email: "admin@example.com",
+        profilePictureUrl: null,
         role: "admin" as UserRole,
-        departmentName: null,
+        departmentName: "General Administration",
+        permissionLevel: "full_access",
       },
       {
-        username: "student1",
+        name: "Student Alice",
         password: "password123",
-        email: "student1@example.com",
+        email: "student.alice@example.com",
+        profilePictureUrl: null,
         role: "student" as UserRole,
         departmentName: "Computer Science",
-        major: "Software Engineering",
+        program: "B.Tech",
+        branch: "Computer Science & Engineering",
+        expectedGraduationYear: 2027,
+        currentYearOfStudy: 1,
+        gpa: null,
+        academicStatus: "Good Standing",
+        fatherName: "John Doe",
+        motherName: "Jane Doe",
+        dateOfBirth: "2005-06-15",
+        phoneNumber: "9876543210",
+        permanentAddress: "123 Main St, Anytown, India",
+        currentAddress: "Room 101, Hostel A, College Campus",
       },
       {
-        username: "student2",
+        name: "Student Bob",
         password: "password123",
-        email: "student2@example.com",
+        email: "student.bob@example.com",
+        profilePictureUrl: null,
         role: "student" as UserRole,
         departmentName: "Mathematics",
-        major: "Applied Mathematics",
+        program: "B.Sc.",
+        branch: "Mathematics",
+        expectedGraduationYear: 2026,
+        currentYearOfStudy: 2,
+        gpa: 3.8,
+        academicStatus: "Good Standing",
+        fatherName: "Robert Smith",
+        motherName: "Susan Smith",
+        dateOfBirth: "2004-02-20",
+        phoneNumber: "8765432109",
+        permanentAddress: "456 Oak Ave, Othercity, India",
+        currentAddress: "Room 202, Hostel B, College Campus",
       },
       {
-        username: "faculty1",
+        name: "Faculty Carol",
         password: "password123",
-        email: "faculty1@example.com",
+        email: "faculty.carol@example.com",
+        profilePictureUrl: null,
         role: "faculty" as UserRole,
         departmentName: "Computer Science",
         office: "CS-101",
         spec: "AI",
       },
       {
-        username: "faculty2",
+        name: "Faculty David",
         password: "password123",
-        email: "faculty2@example.com",
+        email: "faculty.david@example.com",
+        profilePictureUrl: null,
         role: "faculty" as UserRole,
         departmentName: "Mathematics",
         office: "MA-205",
         spec: "Algebra",
       },
     ];
-    const userIds: { [username: string]: number } = {};
-    const facultyUserIds: { [username: string]: number } = {};
-    let studentCounter = 0; // For generating studentRegistrationId suffix
+    const userStringIds: { [name: string]: string } = {}; // Stores the generated string ID for users
 
     for (const userData of usersToSeed) {
       const passwordHash = await bcrypt.hash(userData.password, 10);
       const userPrimaryDepartmentId = userData.departmentName
         ? departmentIds[userData.departmentName]
         : null;
+
+      let currentUserId: string; // This will be the string ID (e.g., A1234, F5678, 20250001)
+
       try {
-        const userInsertResult = await run(
-          "INSERT INTO users (username, passwordHash, email, departmentId) VALUES (?, ?, ?, ?)",
+        // Generate role-specific ID which will be users.id
+        if (userData.role === "student") {
+          currentUserId = await generateUniqueStudentId();
+        } else if (userData.role === "faculty") {
+          currentUserId = await generateUniqueIdWithNumericSuffix("F", 4);
+        } else if (userData.role === "admin") {
+          currentUserId = await generateUniqueIdWithNumericSuffix("A", 4);
+        } else if (userData.role === "superuser") {
+          currentUserId = await generateUniqueIdWithNumericSuffix("SU", 4);
+        } else {
+          // Fallback for any other role or if role is misconfigured, though unlikely with UserRole type
+          currentUserId = await generateUniqueIdWithNumericSuffix("U", 6);
+        }
+
+        // Insert into users table using the generated string ID
+        await run(
+          "INSERT INTO users (id, name, passwordHash, email, profilePictureUrl, departmentId) VALUES (?, ?, ?, ?, ?, ?)",
           [
-            userData.username,
+            currentUserId,
+            userData.name,
             passwordHash,
             userData.email,
+            userData.profilePictureUrl,
             userPrimaryDepartmentId,
           ]
         );
-        userIds[userData.username] = userInsertResult.lastID;
-        logger.info(
-          `User ${userData.username} inserted with ID ${userInsertResult.lastID}.`
-        );
+        userStringIds[userData.name] = currentUserId; // Store the string ID
+        logger.info(`User ${userData.name} inserted with ID ${currentUserId}.`);
 
-        const currentUserId = userInsertResult.lastID;
+        // Insert into role-specific tables
         if (userData.role === "student") {
-          studentCounter++;
-          const studentRegistrationId = `2025${studentCounter
-            .toString()
-            .padStart(6, "0")}`;
           await run(
-            "INSERT INTO students (userId, studentRegistrationId, major, enrollmentDate) VALUES (?, ?, ?, ?)",
+            `INSERT INTO students (userId, enrollmentDate, program, branch, 
+                                   expectedGraduationYear, currentYearOfStudy, gpa, academicStatus,
+                                   fatherName, motherName, dateOfBirth, phoneNumber, permanentAddress, currentAddress) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
               currentUserId,
-              studentRegistrationId,
-              userData.major || "Undeclared",
               new Date().toISOString(),
+              userData.program,
+              userData.branch,
+              userData.expectedGraduationYear,
+              userData.currentYearOfStudy,
+              userData.gpa,
+              userData.academicStatus,
+              userData.fatherName,
+              userData.motherName,
+              userData.dateOfBirth,
+              userData.phoneNumber,
+              userData.permanentAddress,
+              userData.currentAddress,
             ]
           );
           logger.info(
-            `Student ${userData.username} details inserted with studentRegistrationId ${studentRegistrationId}.`
+            `Student ${userData.name} details inserted with userId ${currentUserId}.`
           );
         } else if (userData.role === "faculty") {
           const facultyDeptIdForFacultyTable =
             departmentIds[userData.departmentName!];
           if (!facultyDeptIdForFacultyTable) {
             logger.error(
-              `Faculty ${userData.username} department '${userData.departmentName}' not found. Skipping faculty details.`
+              `Faculty ${userData.name} department '${userData.departmentName}' not found. Skipping faculty details.`
             );
             continue;
           }
-          // Generate 5-digit faculty employee ID (e.g., 1XXXX)
-          const facultyEmployeeId = await generateUniqueEmployeeId(
-            "1",
-            5,
-            "faculty",
-            "facultyEmployeeId"
-          );
           await run(
-            "INSERT INTO faculty (userId, facultyEmployeeId, departmentId, officeNumber, specialization) VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO faculty (userId, departmentId, officeNumber, specialization) VALUES (?, ?, ?, ?)",
             [
               currentUserId,
-              facultyEmployeeId,
               facultyDeptIdForFacultyTable,
               userData.office,
               userData.spec,
             ]
           );
-          facultyUserIds[userData.username] = currentUserId;
           logger.info(
-            `Faculty ${userData.username} details inserted with facultyEmployeeId ${facultyEmployeeId}.`
+            `Faculty ${userData.name} details inserted with userId ${currentUserId}.`
           );
         } else if (userData.role === "admin") {
-          // Generate 5-digit admin employee ID (e.g., 2XXXX)
-          const adminEmployeeId = await generateUniqueEmployeeId(
-            "2",
-            5,
-            "admins",
-            "adminEmployeeId"
-          );
           await run(
-            "INSERT INTO admins (userId, adminEmployeeId, permissionLevel) VALUES (?, ?, ?)",
-            [currentUserId, adminEmployeeId, "full_access"]
+            "INSERT INTO admins (userId, permissionLevel) VALUES (?, ?)",
+            [currentUserId, userData.permissionLevel || "full_access"]
           );
           logger.info(
-            `Admin ${userData.username} details inserted with adminEmployeeId ${adminEmployeeId}.`
+            `Admin ${userData.name} details inserted with userId ${currentUserId}.`
+          );
+        } else if (userData.role === "superuser") {
+          await run(
+            "INSERT INTO superusers (userId, permissions) VALUES (?, ?)",
+            [currentUserId, userData.permissions || "{}"]
+          );
+          logger.info(
+            `Superuser ${userData.name} details inserted with userId ${currentUserId}.`
           );
         }
       } catch (error) {
-        const existingUser = await get<{ id: number }>(
-          "SELECT id FROM users WHERE username = ? OR email = ?",
-          [userData.username, userData.email]
+        const existingUser = await get<User>(
+          "SELECT id FROM users WHERE email = ?",
+          [userData.email]
         );
         if (existingUser) {
-          userIds[userData.username] = existingUser.id;
-          if (userData.role === "faculty")
-            facultyUserIds[userData.username] = existingUser.id;
+          userStringIds[userData.name] = existingUser.id; // Store the existing string ID
         }
         logger.warn(
-          `User ${userData.username} or email ${
+          `User email ${
             userData.email
-          } already exists. ID: ${
-            userIds[userData.username]
-          }. Skipping insertion of user/role details. Error: ${
-            (error as Error).message
-          }`
+          } might already exist, or error during ID generation/insertion. ID: ${
+            userStringIds[userData.name]
+          }. Error: ${(error as Error).message}`
         );
       }
     }
 
+    // Ensure all userStringIds are populated if they existed previously
     for (const u of usersToSeed) {
-      if (!userIds[u.username]) {
-        const existing = await get<{ id: number }>(
-          "SELECT id FROM users WHERE username = ?",
-          [u.username]
+      if (!userStringIds[u.name]) {
+        const existing = await get<User>(
+          "SELECT id FROM users WHERE email = ?",
+          [u.email]
         );
         if (existing) {
-          userIds[u.username] = existing.id;
-          if (u.role === "faculty") facultyUserIds[u.username] = existing.id;
+          userStringIds[u.name] = existing.id;
         }
       }
     }
 
-    // 3. Seed Semesters
     const semestersToSeed = [
       {
         name: "Fall 2024",
@@ -304,7 +364,6 @@ const seedDatabase = async () => {
       }
     }
 
-    // 4. Seed Courses
     const coursesToSeed = [
       {
         courseCode: "CS101",
@@ -355,13 +414,12 @@ const seedDatabase = async () => {
       }
     }
 
-    // 5. Seed Sections
     const sectionsToSeed = [
       {
         sectionCode: "A",
         courseCode: "CS101",
         semesterName: "Fall 2024",
-        facultyUsername: "faculty1",
+        facultyNameKey: "Faculty Carol",
         room: "CS-R1",
         cap: 30,
       },
@@ -369,7 +427,7 @@ const seedDatabase = async () => {
         sectionCode: "B",
         courseCode: "CS101",
         semesterName: "Fall 2024",
-        facultyUsername: "faculty1",
+        facultyNameKey: "Faculty Carol",
         room: "CS-R2",
         cap: 30,
       },
@@ -377,20 +435,19 @@ const seedDatabase = async () => {
         sectionCode: "A",
         courseCode: "MA101",
         semesterName: "Fall 2024",
-        facultyUsername: "faculty2",
+        facultyNameKey: "Faculty David",
         room: "MA-R1",
         cap: 35,
       },
     ];
-    const sectionIds: { [key: string]: number } = {}; // Key: courseCode-semesterName-sectionCode
+    const sectionIds: { [key: string]: number } = {};
     for (const sec of sectionsToSeed) {
       const key = `${sec.courseCode}-${sec.semesterName}-${sec.sectionCode}`;
       try {
-        const facultyIdToAssign = facultyUserIds[sec.facultyUsername];
-        if (!facultyIdToAssign && sec.facultyUsername) {
-          // Check if facultyUsername is defined before warning
+        const facultyIdToAssign = userStringIds[sec.facultyNameKey]; // Use string ID map
+        if (!facultyIdToAssign && sec.facultyNameKey) {
           logger.warn(
-            `Faculty ${sec.facultyUsername} not found for section ${key}, skipping faculty assignment.`
+            `Faculty ${sec.facultyNameKey} not found (string ID map) for section ${key}, skipping faculty assignment.`
           );
         }
         const result = await run(
@@ -423,7 +480,6 @@ const seedDatabase = async () => {
       }
     }
 
-    // 6. Seed Schedules (Meeting Times for Sections)
     const cs101FallA_sectionId = sectionIds["CS101-Fall 2024-A"];
     if (cs101FallA_sectionId) {
       const fall2024StartDate = new Date(
@@ -468,36 +524,47 @@ const seedDatabase = async () => {
       logger.info(`Scheduled meetings for CS101-Fall 2024-A inserted.`);
     }
 
-    // 7. Seed Student Enrollments
-    if (userIds.student1 && cs101FallA_sectionId) {
+    const studentAliceId = userStringIds["Student Alice"]; // Use string ID
+    if (studentAliceId && cs101FallA_sectionId) {
       await run(
         "INSERT INTO student_section_enrollments (studentUserId, sectionId) VALUES (?, ?)",
-        [userIds.student1, cs101FallA_sectionId]
+        [studentAliceId, cs101FallA_sectionId]
       );
-      logger.info(`Student student1 enrolled in CS101-Fall 2024-A.`);
+      logger.info(`Student Alice enrolled in CS101-Fall 2024-A.`);
     }
     const ma101FallA_sectionId = sectionIds["MA101-Fall 2024-A"];
-    if (userIds.student1 && ma101FallA_sectionId) {
+    if (studentAliceId && ma101FallA_sectionId) {
       await run(
         "INSERT INTO student_section_enrollments (studentUserId, sectionId) VALUES (?, ?)",
-        [userIds.student1, ma101FallA_sectionId]
+        [studentAliceId, ma101FallA_sectionId]
       );
-      logger.info(`Student student1 enrolled in MA101-Fall 2024-A.`);
+      logger.info(`Student Alice enrolled in MA101-Fall 2024-A.`);
     }
 
-    // 8. Seed Messages
-    if (userIds.admin && userIds.student1 && facultyUserIds.faculty1) {
+    const superUserId = userStringIds["Super User"];
+    const adminUserId = userStringIds["Admin User"];
+    const facultyCarolId = userStringIds["Faculty Carol"]; // Faculty IDs are now string IDs from userStringIds
+
+    if (superUserId && studentAliceId && facultyCarolId && adminUserId) {
       const messages = [
         {
-          senderId: userIds.admin,
+          senderId: superUserId,
+          subject: "System Maintenance Alert",
+          content:
+            "System will be down for maintenance tonight from 2 AM to 3 AM.",
+          type: "Broadcast",
+          priority: "Critical" as const,
+        },
+        {
+          senderId: adminUserId,
           subject: "Welcome!",
           content: "Welcome to the new ERP system.",
           type: "Broadcast",
           priority: "Normal" as const,
         },
         {
-          senderId: facultyUserIds.faculty1,
-          receiverId: userIds.student1,
+          senderId: facultyCarolId,
+          receiverId: studentAliceId,
           subject: "CS101 Assignment",
           content: "Details for the first CS101 assignment are now available.",
           type: "Direct",

@@ -21,7 +21,7 @@ interface DashboardData {
 const fetchDashboardData = async (): Promise<DashboardData> => {
   const [schedulesResponse, messagesResponse] = await Promise.all([
     apiClient.get<{ data: ScheduleItem[] }>('/schedules/my'),
-    apiClient.get<{ data: Message[] }>('/messages/my?type=Broadcast'), // Fetch all broadcasts
+    apiClient.get<{ data: Message[] }>('/messages/my?type=Broadcast'), 
   ]);
 
   const schedules = schedulesResponse.data.data;
@@ -31,9 +31,9 @@ const fetchDashboardData = async (): Promise<DashboardData> => {
     .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())[0];
 
   const recentAnnouncements = messagesResponse.data.data
-    .filter(m => m.type === 'Broadcast') // Ensure it's a broadcast
+    .filter(m => m.type === 'Broadcast') 
     .sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-    .slice(0,3); // Get top 3 recent
+    .slice(0,3); 
 
   return { nextClass, recentAnnouncements };
 };
@@ -67,7 +67,7 @@ const DashboardCard: React.FC<{title: string, description?: string, icon?: React
 export default function DashboardPage() {
   const { user } = useAuth();
   const { data, isLoading, error } = useQuery<DashboardData, Error>({
-    queryKey: ['dashboardData', user?.id], // Add user?.id to re-fetch if user changes
+    queryKey: ['dashboardData', user?.id], 
     queryFn: fetchDashboardData,
     enabled: !!user, 
   });
@@ -86,7 +86,7 @@ export default function DashboardPage() {
       <div className="space-y-6 sm:space-y-8">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
           <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
-            Welcome back, <span className="text-primary">{user?.username || 'User'}</span>!
+            Welcome back, <span className="text-primary">{user?.name || 'User'}</span>! {/* Changed from user.username */}
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground px-2 py-1 bg-muted rounded-md border border-border">
             Role: <span className="font-semibold text-foreground">{user?.role?.charAt(0).toUpperCase() + user?.role?.slice(1)}</span>
@@ -98,7 +98,7 @@ export default function DashboardPage() {
             <DashboardCard title="Next Up" icon={CalendarClock} footerLink="/schedules" footerText="View Full Schedule" className="bg-card">
               {data?.nextClass ? (
                 <div className="space-y-1.5">
-                  <p className="font-semibold text-lg text-primary">{data.nextClass.className}</p>
+                  <p className="font-semibold text-lg text-primary">{(data.nextClass as any).className || 'Scheduled Event'}</p> {/* Use derived className */}
                   <p className="text-sm text-muted-foreground">
                     {format(new Date(data.nextClass.startTime), "eeee, MMM d, h:mm a")} - {format(new Date(data.nextClass.endTime), "h:mm a")}
                   </p>
@@ -123,9 +123,10 @@ export default function DashboardPage() {
                 {data.recentAnnouncements.map((announcement) => (
                   <li key={announcement.id} className="border-l-4 border-primary pl-3 py-1.5 bg-muted/50 rounded-r-md transition-transform hover:scale-[1.01]">
                     <h4 className="font-medium text-foreground text-sm">{announcement.subject}</h4>
-                    <p className="text-xs text-muted-foreground truncate-2-lines">{announcement.content}</p> {/* Allows 2 lines */}
+                    <p className="text-xs text-muted-foreground truncate-2-lines">{announcement.content}</p>
                     <p className="text-xs text-muted-foreground/80 mt-1">
-                      {formatDistanceToNow(new Date(announcement.timestamp), { addSuffix: true })}
+                      {/* The Message model uses Partial<User> for sender, so sender.name is correct */}
+                      From: {announcement.sender?.name || 'System'} &bull; {formatDistanceToNow(new Date(announcement.timestamp), { addSuffix: true })}
                     </p>
                   </li>
                 ))}
@@ -165,28 +166,3 @@ export default function DashboardPage() {
     </ProtectedRoute>
   );
 }
-
-// Add this to your globals.css or a utility CSS file if you don't have it
-// .truncate-2-lines {
-//   display: -webkit-box;
-//   -webkit-line-clamp: 2;
-//   -webkit-box-orient: vertical;
-//   overflow: hidden;
-//   text-overflow: ellipsis;
-// }
-// .scrollbar-thin {
-//   scrollbar-width: thin;
-//   scrollbar-color: hsl(var(--border)) hsl(var(--background)); /* thumb track */
-// }
-// .scrollbar-thin::-webkit-scrollbar {
-//   width: 6px;
-//   height: 6px;
-// }
-// .scrollbar-thin::-webkit-scrollbar-track {
-//   background: transparent;
-// }
-// .scrollbar-thin::-webkit-scrollbar-thumb {
-//   background-color: hsl(var(--border));
-//   border-radius: 3px;
-//   border: 1px solid hsl(var(--background));
-// }

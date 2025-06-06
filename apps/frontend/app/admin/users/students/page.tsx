@@ -1,3 +1,4 @@
+
 'use client';
 import React, { useState, useMemo, useEffect } from 'react';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -9,7 +10,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { GraduationCap, UserPlus, ArrowLeft, Edit, Trash2, MoreHorizontal, Search, Loader2, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
-import { useToast } from '@/components/hooks/use-toast';
+import { useToast } from '@/components/ui/use-toast';
 import { UserFormDialog, UserFormValues } from '@/components/admin/UserFormDialog';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { Department, UserProfileResponse, CreateUserInput, UserPayload, APIResponse, UpdateUserInput } from '@college-erp/common';
@@ -28,7 +29,7 @@ const fetchAllDepartments = async (): Promise<Department[]> => {
     return response.data.data || [];
 };
 
-const fetchUserProfile = async (userId: number): Promise<UserProfileResponse> => {
+const fetchUserProfile = async (userId: string): Promise<UserProfileResponse> => { // userId is string
     const response = await apiClient.get<APIResponse<UserProfileResponse>>(`/users/${userId}`);
     return response.data.data!;
 };
@@ -43,7 +44,7 @@ export default function ManageStudentsPage() {
   const [editingUserFullProfile, setEditingUserFullProfile] = useState<UserProfileResponse | null>(null); 
   const [isEditingMode, setIsEditingMode] = useState(false);
   const [isConfirmDeleteDialogOpen, setIsConfirmDeleteDialogOpen] = useState(false);
-  const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null); // userId is string
   const [isFetchingProfileForEdit, setIsFetchingProfileForEdit] = useState(false);
 
   const { data: allUsers, isLoading: usersLoading, error: usersError } = useQuery<UserPayload[], Error>({
@@ -51,9 +52,8 @@ export default function ManageStudentsPage() {
     queryFn: fetchAdminUsers,
   });
 
-  // Departments might be less relevant for students but good to have for UserFormDialog consistency
   const { data: departments, isLoading: departmentsLoading, error: departmentsError } = useQuery<Department[], Error>({
-    queryKey: ['allAdminDepartments'],
+    queryKey: ['allAdminDepartments'], // Still needed for UserFormDialog if student can have an optional department
     queryFn: fetchAllDepartments,
   });
   
@@ -62,8 +62,11 @@ export default function ManageStudentsPage() {
     const filtered = allUsers.filter(u => u.role === 'student');
     if (!searchTerm) return filtered;
     return filtered.filter(
-      u => u.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-           u.email.toLowerCase().includes(searchTerm.toLowerCase())
+      u => u.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+           u.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+           u.studentRegistrationId?.toLowerCase().includes(searchTerm.toLowerCase()) || // studentRegistrationId is user.id
+           u.program?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+           u.branch?.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [allUsers, searchTerm]);
 
@@ -80,7 +83,7 @@ export default function ManageStudentsPage() {
     },
   });
   
-   const updateUserMutation = useMutation<UserPayload, Error, { userId: number; data: UpdateUserInput }>({
+   const updateUserMutation = useMutation<UserPayload, Error, { userId: string; data: UpdateUserInput }>({ // userId is string
     mutationFn: ({ userId, data }) => apiClient.put<APIResponse<UserPayload>>(`/users/${userId}`, data).then(res => res.data.data!),
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['allAdminUsersForStudentPage'] });
@@ -92,7 +95,7 @@ export default function ManageStudentsPage() {
     onError: (error) => toast({ title: "Update Failed", description: error.message, variant: "destructive" }),
   });
 
-  const deleteUserMutation = useMutation<void, Error, number>({
+  const deleteUserMutation = useMutation<void, Error, string>({ // userId is string
     mutationFn: (userId) => apiClient.delete(`/users/${userId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['allAdminUsersForStudentPage'] });
@@ -112,10 +115,10 @@ export default function ManageStudentsPage() {
     setIsUserFormOpen(true);
   };
 
-  const handleOpenEditDialog = async (studentUser: UserPayload) => {
+  const handleOpenEditDialog = async (studentUser: UserPayload) => { // studentUser.id is string
     setIsFetchingProfileForEdit(true);
     try {
-        const profile = await fetchUserProfile(studentUser.id);
+        const profile = await fetchUserProfile(studentUser.id); // Pass string ID
         setEditingUserFullProfile(profile);
         setIsEditingMode(true);
         setIsUserFormOpen(true);
@@ -126,22 +129,32 @@ export default function ManageStudentsPage() {
     }
   };
 
-  const handleOpenDeleteDialog = (userId: number) => {
+  const handleOpenDeleteDialog = (userId: string) => { // userId is string
     setDeletingUserId(userId);
     setIsConfirmDeleteDialogOpen(true);
   };
   
-  const onUserFormSubmit = async (values: UserFormValues, isEditingSubmit: boolean) => {
-    const departmentIdNumber = values.departmentId ? parseInt(values.departmentId, 10) : null; // Students might not have a department
+  const onUserFormSubmit = async (values: UserFormValues & { departmentId?: number | null }, isEditingSubmit: boolean) => {
      if (isEditingSubmit && editingUserFullProfile) {
        const updatePayload: UpdateUserInput = { 
-           username: values.username, 
-           email: values.email, 
-           departmentId: departmentIdNumber, // Students usually don't have primary dept this way
-           major: values.major,
-           // role: 'student' // Role change not allowed usually
+           name: values.name, 
+           email: values.email,
+           profilePictureUrl: values.profilePictureUrl,
+           departmentId: values.departmentId, // Students might have an optional department
+           program: values.program,
+           branch: values.branch,
+           expectedGraduationYear: values.expectedGraduationYear,
+           currentYearOfStudy: values.currentYearOfStudy,
+           gpa: values.gpa,
+           academicStatus: values.academicStatus,
+           fatherName: values.fatherName,
+           motherName: values.motherName,
+           dateOfBirth: values.dateOfBirth,
+           phoneNumber: values.phoneNumber,
+           permanentAddress: values.permanentAddress,
+           currentAddress: values.currentAddress,
         };
-       await updateUserMutation.mutateAsync({ userId: editingUserFullProfile.id, data: updatePayload });
+       await updateUserMutation.mutateAsync({ userId: editingUserFullProfile.id, data: updatePayload }); // editingUserFullProfile.id is string
     } else {
       if (!values.password) { 
         toast({ title: "Validation Error", description: "Password is required for new users.", variant: "destructive" });
@@ -152,12 +165,24 @@ export default function ManageStudentsPage() {
          return;
        }
       const createPayload: CreateUserInput = {
-        username: values.username,
+        name: values.name,
         email: values.email,
+        profilePictureUrl: values.profilePictureUrl,
         password_DO_NOT_USE_THIS_FIELD_EVER_EXCEPT_ON_CREATE_ONLY: values.password,
         role: 'student', 
-        departmentId: departmentIdNumber, 
-        major: values.major,
+        departmentId: values.departmentId,
+        program: values.program,
+        branch: values.branch,
+        expectedGraduationYear: values.expectedGraduationYear,
+        currentYearOfStudy: values.currentYearOfStudy,
+        gpa: values.gpa,
+        academicStatus: values.academicStatus,
+        fatherName: values.fatherName,
+        motherName: values.motherName,
+        dateOfBirth: values.dateOfBirth,
+        phoneNumber: values.phoneNumber,
+        permanentAddress: values.permanentAddress,
+        currentAddress: values.currentAddress,
       };
       await createUserMutation.mutateAsync(createPayload);
     }
@@ -169,7 +194,7 @@ export default function ManageStudentsPage() {
     }
   };
 
-  const pageIsLoading = usersLoading || departmentsLoading;
+  const pageIsLoading = usersLoading || departmentsLoading; // departmentsLoading is still relevant for the form
   const pageError = usersError || departmentsError;
 
   return (
@@ -198,7 +223,7 @@ export default function ManageStudentsPage() {
              <div className="mt-4 flex items-center gap-2">
                 <Search className="h-5 w-5 text-muted-foreground" />
                 <Input 
-                    placeholder="Search by name or email..."
+                    placeholder="Search by name, email, ID, program, branch..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="max-w-sm"
@@ -220,21 +245,22 @@ export default function ManageStudentsPage() {
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Username</TableHead>
+                            <TableHead>Student ID</TableHead>
+                            <TableHead>Name</TableHead>
                             <TableHead>Email</TableHead>
-                            <TableHead>Major</TableHead> {/* Student specific */}
+                            <TableHead>Program</TableHead>
+                            <TableHead>Branch</TableHead>
                             <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {studentUsers.length > 0 ? studentUsers.map((student) => (
+                        {studentUsers.length > 0 ? studentUsers.map((student) => ( // student.id and student.studentRegistrationId are string
                             <TableRow key={student.id}>
-                                <TableCell className="font-medium">{student.username}</TableCell>
+                                <TableCell className="font-mono text-xs">{student.studentRegistrationId || student.id}</TableCell> {/* student.id is the reg ID */}
+                                <TableCell className="font-medium">{student.name}</TableCell>
                                 <TableCell>{student.email}</TableCell>
-                                <TableCell>
-                                    {/* Major is not in UserPayload, would need UserProfileResponse or separate fetch for table, or adjust backend for getAllUsers */}
-                                    N/A 
-                                </TableCell>
+                                <TableCell>{student.program || 'N/A'}</TableCell>
+                                <TableCell>{student.branch || 'N/A'}</TableCell>
                                 <TableCell className="text-right">
                                      <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
@@ -256,7 +282,7 @@ export default function ManageStudentsPage() {
                             </TableRow>
                         )) : (
                             <TableRow>
-                                <TableCell colSpan={4} className="text-center text-muted-foreground py-6">
+                                <TableCell colSpan={6} className="text-center text-muted-foreground py-6"> 
                                      {searchTerm ? 'No students match your search.' : 'No students found.'}
                                 </TableCell>
                             </TableRow>
@@ -265,7 +291,6 @@ export default function ManageStudentsPage() {
                     <TableCaption>{studentUsers.length} student(s) found.</TableCaption>
                 </Table>
             )}
-            <p className="text-xs text-muted-foreground mt-2">Note: Displaying major in the table requires fetching full student profiles, which can impact performance for large lists. This feature will be optimized.</p>
           </CardContent>
         </Card>
 
@@ -273,7 +298,7 @@ export default function ManageStudentsPage() {
             isOpen={isUserFormOpen} 
             onOpenChange={setIsUserFormOpen}
             onSubmit={onUserFormSubmit}
-            defaultValues={editingUserFullProfile || { role: 'student' }}
+            defaultValues={editingUserFullProfile || { role: 'student', departmentId: null }} 
             isEditing={isEditingMode}
             departments={departments || []} 
             isLoading={createUserMutation.isPending || updateUserMutation.isPending || departmentsLoading || isFetchingProfileForEdit}

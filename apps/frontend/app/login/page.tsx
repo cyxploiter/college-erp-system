@@ -1,86 +1,115 @@
 'use client';
-import React, { useState, useEffect } from 'react';
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useAuth } from '@/hooks/useAuth';
-import { useRouter } from 'next/navigation'; 
-import { Loader2, AlertTriangle, LogIn } from 'lucide-react'; 
-import { APIResponse } from '@college-erp/common';
 
-// Placeholder CollegeIcon (can be replaced with an actual SVG or Lucide icon)
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/components/ui/use-toast';
+import { useAuth } from '@/hooks/useAuth'; // Keep useAuth to check existing session
+import { Loader2, AlertTriangle, LogIn } from 'lucide-react';
+import { APIResponse, LoginResponse } from '@college-erp/common';
+import apiClient from '@/lib/apiClient';
+
 const CollegeIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg fill="currentColor" viewBox="0 0 20 20" {...props}>
     <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3.5a1 1 0 00.002 1.792l7 3.5a1 1 0 00.786 0l7-3.5a1 1 0 00.002-1.792l-7-3.5zM3 9V17a1 1 0 001 1h12a1 1 0 001-1V9l-7 3.5L3 9z"></path>
   </svg>
 );
 
-const loginSchema = z.object({
-  identifier: z.string().min(1, { message: "Student/Employee ID is required." }), // Changed from username
-  password: z.string().min(1, { message: "Password is required." }),
-});
-
-type LoginFormValues = z.infer<typeof loginSchema>;
+const BACKEND_API_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001/api';
 
 export default function LoginPage() {
-  const { login, isLoading: authLoading, isAuthenticated } = useAuth();
-  const [error, setError] = useState<string | null>(null);
+  const [identifier, setIdentifierState] = useState(''); // Renamed to avoid conflict
+  const [password, setPasswordState] = useState(''); // Renamed to avoid conflict
+  const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false); // Changed from isLoading to avoid conflict
+  
   const router = useRouter();
-
-  const form = useForm<LoginFormValues>({
-    resolver: zodResolver(loginSchema),
-    defaultValues: {
-      identifier: "", // Changed from username
-      password: "",
-    },
-  });
+  const { toast } = useToast();
+  const { login: contextLogin, isLoading: authLoading, user, isAuthenticated } = useAuth(); // Get auth context
 
   useEffect(() => {
-    if (isAuthenticated()) {
+    // If user is already authenticated (e.g. from a previous session loaded by AuthContext), redirect
+    if (isAuthenticated() && user && !authLoading) {
       router.replace('/dashboard');
     }
-  }, [isAuthenticated, router]);
+  }, [user, isAuthenticated, authLoading, router]);
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
 
-  const onSubmit = async (data: LoginFormValues) => {
-    setError(null);
+    // Validate inputs
+    if (!identifier.trim()) {
+      setError('Student/Employee ID is required.');
+      return;
+    }
+    if (!password.trim()) {
+      setError('Password is required.');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    const payload = { identifier, password };
+    console.log(`Sending payload to ${BACKEND_API_URL}/auth/login:`, payload);
+
     try {
-      await login(data.identifier, data.password); // Pass identifier
+      // Use the custom API client for the POST request
+      const res = await apiClient.post('/auth/login', payload);
+
+      const data: APIResponse<LoginResponse> = res.data;
+
+      if (!data.success) {
+        throw new Error(data.message || data.error || 'An unknown error occurred.');
+      }
+
+      // If the request is successful, update localStorage and show success toast
+      if (data.data?.token && data.data?.user) {
+        localStorage.setItem('authToken', data.data.token);
+        localStorage.setItem('authUser', JSON.stringify(data.data.user));
+        toast({
+          title: 'Login Successful',
+          description: 'Redirecting to your dashboard...',
+          variant: 'default',
+          className: "bg-success text-success-foreground border-success"
+        });
+        window.location.href = '/dashboard'; // Force reload to ensure AuthContext picks up
+      } else {
+        throw new Error('Login response was successful but did not contain token or user data.');
+      }
     } catch (err: any) {
-        const apiError = err as APIResponse<null>; 
-        if (apiError && apiError.message) {
-            setError(apiError.message);
-        } else if (err.message) {
-             setError(err.message);
-        }
-         else {
-            setError("An unexpected error occurred. Please try again.");
-        }
+      console.error('Login failed:', err);
+      if (err.message === 'Invalid identifier or password.' || err.status === 401) {
+        setError('Failed to login. Please check your credentials.');
+      } else {
+        setError(err.message || 'An unknown error occurred.');
+      }
+      setIsSubmitting(false);
     }
   };
-  
-  if (authLoading && !error && !isAuthenticated()) { 
+
+  if (authLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="mt-4 text-muted-foreground">Loading...</p>
+        <p className="mt-4 text-muted-foreground">Loading session...</p>
       </div>
     );
   }
   
-  if (isAuthenticated()) { // Handles the case where redirect is happening
+  // If user becomes authenticated while on this page (e.g. by AuthContext loading from localStorage)
+  // And we are not in an error state from a failed login attempt.
+  if (isAuthenticated() && user && !error) {
      return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="mt-4 text-muted-foreground">Redirecting to dashboard...</p>
+        <p className="mt-4 text-muted-foreground">Already logged in. Redirecting...</p>
       </div>
     );
   }
-
 
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-center bg-muted p-4 selection:bg-primary/20">
@@ -96,34 +125,32 @@ export default function LoginPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="p-6 sm:p-8">
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-1.5">
-              <Label htmlFor="identifier" className="text-sm font-medium text-foreground">Student/Employee ID</Label> {/* Changed label */}
+              <Label htmlFor="identifier">Student/Employee ID</Label>
               <Input
-                id="identifier" // Changed id
+                id="identifier"
                 type="text"
-                placeholder="e.g., 2025000001 or 10123" // Changed placeholder
-                {...form.register("identifier")} // Register identifier
+                placeholder="e.g., 2025000001 or A1234"
+                value={identifier}
+                onChange={(e) => setIdentifierState(e.target.value)}
                 className="shadcn-input h-11 text-sm sm:text-base" 
-                autoComplete="username" // Keep autocomplete as username for browser compatibility if desired, or change to off
+                autoComplete="username" 
+                disabled={isSubmitting || authLoading}
               />
-              {form.formState.errors.identifier && ( // Check errors for identifier
-                <p className="text-xs text-destructive pt-0.5">{form.formState.errors.identifier.message}</p>
-              )}
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="password" className="text-sm font-medium text-foreground">Password</Label>
+              <Label htmlFor="password">Password</Label>
               <Input
                 id="password"
                 type="password"
                 placeholder="••••••••"
-                {...form.register("password")}
+                value={password}
+                onChange={(e) => setPasswordState(e.target.value)}
                 className="shadcn-input h-11 text-sm sm:text-base"
                 autoComplete="current-password"
+                disabled={isSubmitting || authLoading}
               />
-              {form.formState.errors.password && (
-                <p className="text-xs text-destructive pt-0.5">{form.formState.errors.password.message}</p>
-              )}
             </div>
             
             {error && (
@@ -133,8 +160,12 @@ export default function LoginPage() {
               </div>
             )}
 
-            <Button type="submit" className="w-full bg-primary text-primary-foreground hover:bg-primary/90 h-11 text-base font-semibold" disabled={authLoading}>
-              {authLoading ? (
+            <Button 
+              type="submit" 
+              className="w-full bg-primary text-primary-foreground hover:bg-primary/90 h-11 text-base font-semibold" 
+              disabled={isSubmitting || authLoading}
+            >
+              {(isSubmitting || authLoading) ? ( 
                 <Loader2 className="mr-2 h-5 w-5 animate-spin" />
               ) : (
                 <>

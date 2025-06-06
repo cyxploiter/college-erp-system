@@ -7,6 +7,8 @@ import {
   UserRole,
   UserProfileResponse,
   Department,
+  CreateUserInput,
+  UpdateUserInput,
 } from "@/types";
 import { z } from "zod";
 import { HttpError } from "@/middleware/errorHandler";
@@ -20,9 +22,8 @@ export const getMyProfile = async (
     if (!req.user) {
       return next(new HttpError("Unauthorized: No user context.", 401));
     }
-    const userProfile = await userService.getUserProfileById(req.user.id); // Returns UserProfileResponse
+    const userProfile = await userService.getUserProfileById(req.user.id); // req.user.id is already string
     const response: APIResponse<UserProfileResponse> = {
-      // Adjusted type
       success: true,
       data: userProfile,
     };
@@ -32,28 +33,52 @@ export const getMyProfile = async (
   }
 };
 
-// --- Admin User Management Controllers ---
-
-const userRoleEnum = z.enum(["student", "faculty", "admin"]);
+const userRoleEnum = z.enum(["student", "faculty", "admin", "superuser"]);
 
 export const createUserSchema = z.object({
   body: z.object({
-    username: z
+    name: z
       .string()
-      .min(3, "Username must be at least 3 characters long.")
-      .max(50),
+      .min(3, "Name must be at least 3 characters long.")
+      .max(100),
     email: z.string().email("Invalid email address."),
+    profilePictureUrl: z
+      .string()
+      .url("Invalid URL for profile picture.")
+      .optional()
+      .nullable(),
     password: z
       .string()
       .min(8, "Password must be at least 8 characters long.")
       .max(100),
     role: userRoleEnum,
-    departmentId: z.number().int().positive().optional().nullable(), // For faculty's department or user's general dept
-    // Optional role-specific fields
-    major: z.string().optional().nullable(), // For student
-    officeNumber: z.string().optional().nullable(), // For faculty
-    specialization: z.string().optional().nullable(), // For faculty
-    permissionLevel: z.string().optional().nullable(), // For admin
+    departmentId: z.number().int().positive().optional().nullable(),
+
+    program: z.string().max(100).optional().nullable(),
+    branch: z.string().max(100).optional().nullable(),
+    expectedGraduationYear: z.number().int().positive().optional().nullable(),
+    currentYearOfStudy: z.number().int().min(1).max(10).optional().nullable(),
+    gpa: z.number().min(0).max(10).optional().nullable(),
+    academicStatus: z.string().max(50).optional().nullable(),
+    fatherName: z.string().max(100).optional().nullable(),
+    motherName: z.string().max(100).optional().nullable(),
+    dateOfBirth: z
+      .string()
+      .optional()
+      .nullable()
+      .refine((val) => !val || !isNaN(Date.parse(val)), {
+        message: "Invalid date format for Date of Birth",
+      }),
+    phoneNumber: z.string().max(20).optional().nullable(),
+    permanentAddress: z.string().max(255).optional().nullable(),
+    currentAddress: z.string().max(255).optional().nullable(),
+
+    officeNumber: z.string().max(50).optional().nullable(),
+    specialization: z.string().max(100).optional().nullable(),
+
+    permissionLevel: z.string().max(50).optional().nullable(),
+
+    superuserPermissions: z.string().optional().nullable(),
   }),
 });
 
@@ -63,8 +88,7 @@ export const handleCreateUser = async (
   next: NextFunction
 ) => {
   try {
-    // const { username, email, password, role, departmentId, major, officeNumber, specialization, permissionLevel } = (req as any).body;
-    const createUserInput: userService.CreateUserInput = {
+    const createUserInput: CreateUserInput = {
       ...(req as any).body,
       password_DO_NOT_USE_THIS_FIELD_EVER_EXCEPT_ON_CREATE_ONLY: (req as any)
         .body.password,
@@ -88,7 +112,7 @@ export const handleGetAllUsers = async (
   next: NextFunction
 ) => {
   try {
-    const users = await userService.getAllUsers(); // Returns UserPayload[]
+    const users = await userService.getAllUsers();
     const response: APIResponse<UserPayload[]> = {
       success: true,
       data: users,
@@ -105,18 +129,13 @@ export const handleGetUserById = async (
   next: NextFunction
 ) => {
   try {
-    const userId = parseInt((req as any).params.userId, 10);
-    if (isNaN(userId)) {
-      return next(new HttpError("Invalid user ID format.", 400));
-    }
-    // Use getUserProfileById to get detailed info including role-specific details
-    const user = await userService.getUserProfileById(userId); // Returns UserProfileResponse
+    const userId = (req as any).params.userId as string; // userId from URL param is string
+    // No need to parseInt, userService.getUserProfileById expects string
+    const user = await userService.getUserProfileById(userId);
     if (!user) {
-      // Should be caught by HttpError in service, but double check
       return next(new HttpError("User not found.", 404));
     }
     const response: APIResponse<UserProfileResponse> = {
-      // Adjusted type
       success: true,
       data: user,
     };
@@ -128,21 +147,40 @@ export const handleGetUserById = async (
 
 export const updateUserSchema = z.object({
   params: z.object({
-    userId: z.string().refine((val) => !isNaN(parseInt(val, 10)), {
-      message: "User ID must be a number.",
-    }),
+    userId: z.string().min(1, "User ID is required."), // userId is now a string
   }),
   body: z
     .object({
-      username: z.string().min(3).max(50).optional(),
+      name: z.string().min(3).max(100).optional(),
       email: z.string().email().optional(),
-      role: userRoleEnum.optional(),
+      profilePictureUrl: z.string().url().optional().nullable(),
       departmentId: z.number().int().positive().optional().nullable(),
-      // Optional role-specific fields
-      major: z.string().optional().nullable(),
-      officeNumber: z.string().optional().nullable(),
-      specialization: z.string().optional().nullable(),
-      permissionLevel: z.string().optional().nullable(),
+
+      program: z.string().max(100).optional().nullable(),
+      branch: z.string().max(100).optional().nullable(),
+      expectedGraduationYear: z.number().int().positive().optional().nullable(),
+      currentYearOfStudy: z.number().int().min(1).max(10).optional().nullable(),
+      gpa: z.number().min(0).max(10).optional().nullable(),
+      academicStatus: z.string().max(50).optional().nullable(),
+      fatherName: z.string().max(100).optional().nullable(),
+      motherName: z.string().max(100).optional().nullable(),
+      dateOfBirth: z
+        .string()
+        .optional()
+        .nullable()
+        .refine((val) => !val || !isNaN(Date.parse(val)), {
+          message: "Invalid date format",
+        }),
+      phoneNumber: z.string().max(20).optional().nullable(),
+      permanentAddress: z.string().max(255).optional().nullable(),
+      currentAddress: z.string().max(255).optional().nullable(),
+
+      officeNumber: z.string().max(50).optional().nullable(),
+      specialization: z.string().max(100).optional().nullable(),
+
+      permissionLevel: z.string().max(50).optional().nullable(),
+
+      superuserPermissions: z.string().optional().nullable(),
     })
     .refine((data) => Object.keys(data).length > 0, {
       message: "At least one field must be provided for update.",
@@ -155,10 +193,10 @@ export const handleUpdateUserById = async (
   next: NextFunction
 ) => {
   try {
-    const userId = parseInt((req as any).params.userId, 10);
-    const updateData = (req as any).body as userService.UpdateUserInput;
+    const userId = (req as any).params.userId as string; // userId is string
+    const updateData = (req as any).body as UpdateUserInput;
 
-    const updatedUser = await userService.updateUserById(userId, updateData); // Returns UserPayload
+    const updatedUser = await userService.updateUserById(userId, updateData);
     const response: APIResponse<UserPayload> = {
       success: true,
       data: updatedUser,
@@ -176,11 +214,9 @@ export const handleDeleteUserById = async (
   next: NextFunction
 ) => {
   try {
-    const userId = parseInt((req as any).params.userId, 10);
-    if (isNaN(userId)) {
-      return next(new HttpError("Invalid user ID format.", 400));
-    }
+    const userId = (req as any).params.userId as string; // userId is string
     if (req.user?.id === userId) {
+      // req.user.id is string
       return next(
         new HttpError("Cannot delete your own account via this endpoint.", 403)
       );
@@ -197,7 +233,6 @@ export const handleDeleteUserById = async (
   }
 };
 
-// Controller for departments
 export const handleGetAllDepartments = async (
   req: AuthenticatedRequest,
   res: Response,

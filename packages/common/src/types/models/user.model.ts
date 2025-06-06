@@ -3,45 +3,66 @@
 // unless a model explicitly needs to reference UserRole type for a property.
 
 export interface User {
-  id: number;
-  username: string;
+  id: string; // Changed from number
+  name: string;
   passwordHash?: string; // Should not be sent to client
   email: string;
-  departmentId?: number | null; // Optional: Foreign key to departments table
+  profilePictureUrl?: string | null;
+  departmentId?: number | null;
   createdAt: string; // ISO date string
   updatedAt: string; // ISO date string
-  // Role is now determined by association with StudentDetail, FacultyDetail, or AdminDetail
 }
 
 export interface StudentDetail {
-  id: number;
-  userId: number; // Foreign key to users table
-  studentRegistrationId?: string; // e.g., "2025000001"
+  id: number; // Internal primary key for the students table itself
+  userId: string; // Foreign key to users table, Changed from number
+  // studentRegistrationId: string; // REMOVED - This is now users.id
   enrollmentDate?: string | null; // ISO date string
-  major?: string | null;
-  // Add other student-specific fields here
+
+  program?: string | null;
+  branch?: string | null;
+
+  expectedGraduationYear?: number | null;
+  currentYearOfStudy?: number | null;
+  gpa?: number | null;
+  academicStatus?: string | null;
+
+  fatherName?: string | null;
+  motherName?: string | null;
+  dateOfBirth?: string | null;
+  phoneNumber?: string | null;
+  permanentAddress?: string | null;
+  currentAddress?: string | null;
+
   createdAt: string;
   updatedAt: string;
 }
 
 export interface FacultyDetail {
-  id: number;
-  userId: number; // Foreign key to users table
-  facultyEmployeeId?: string; // e.g., "10123"
-  departmentId: number; // Foreign key to departments table (faculty must belong to a department)
+  id: number; // Internal primary key for the faculty table itself
+  userId: string; // Foreign key to users table, Changed from number
+  // facultyEmployeeId: string; // REMOVED - This is now users.id
+  departmentId: number;
   officeNumber?: string | null;
   specialization?: string | null;
-  // Add other faculty-specific fields here
   createdAt: string;
   updatedAt: string;
 }
 
 export interface AdminDetail {
-  id: number;
-  userId: number; // Foreign key to users table
-  adminEmployeeId?: string; // e.g., "20001"
-  permissionLevel?: string | null; // e.g., 'full_access', 'content_manager'
-  // Add other admin-specific fields here
+  id: number; // Internal primary key for the admins table itself
+  userId: string; // Foreign key to users table, Changed from number
+  // adminEmployeeId: string; // REMOVED - This is now users.id
+  permissionLevel?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SuperuserDetail {
+  id: number; // Internal primary key for the superusers table itself
+  userId: string; // Foreign key to users table, Changed from number
+  // superuserEmployeeId: string; // REMOVED - This is now users.id
+  permissions?: string | null; // JSON string for specific permissions
   createdAt: string;
   updatedAt: string;
 }

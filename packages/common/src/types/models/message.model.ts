@@ -1,17 +1,19 @@
-
-import { UserRole } from '../api/general.api'; // Relative import for UserRole
-import { User } from './user.model'; // Relative import for User
+import { UserRole } from "../api/general.api";
+import { User } from "./user.model";
 
 export interface Message {
   id: number;
-  senderId?: number | null; // Foreign key to users table, null for system messages
-  receiverId?: number | null; // Foreign key to users table, null for broadcast
+  senderId?: string | null; // Foreign key to users table, null for system messages. Changed from number
+  receiverId?: string | null; // Foreign key to users table, null for broadcast. Changed from number
   subject: string;
   content: string;
   timestamp: string; // ISO date string
-  priority: 'Normal' | 'Urgent' | 'Critical';
-  type: 'Broadcast' | 'Direct'; // Type of message stored in DB
+  priority: "Normal" | "Urgent" | "Critical";
+  type: "Broadcast" | "Direct";
   createdAt: string; // ISO date string
-  isRead?: boolean; // Added from init.ts
-  sender?: Partial<User> & { role?: UserRole; senderUsername?: string }; // Optional: for populating sender details, role is dynamic
+  isRead?: boolean;
+  sender?: Partial<Omit<User, "id"> & { id?: string }> & {
+    role?: UserRole;
+    senderUsername?: string;
+  }; // User.id is now string
 }

@@ -1,4 +1,3 @@
-
 export interface APIResponse<T = unknown> {
   success: boolean;
   message?: string;
@@ -7,4 +6,4 @@ export interface APIResponse<T = unknown> {
   details?: unknown;
 }
 
-export type UserRole = 'student' | 'faculty' | 'admin';
+export type UserRole = "student" | "faculty" | "admin" | "superuser";

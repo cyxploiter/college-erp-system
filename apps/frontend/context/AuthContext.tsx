@@ -1,14 +1,15 @@
+
 'use client';
 import React, { createContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { UserPayload, LoginResponse } from '@college-erp/common';
-import apiClient from '@/lib/apiClient'; // Assuming an axios instance setup
-import { useRouter } from 'next/navigation'; // Using App Router's navigation
+import apiClient from '@/lib/apiClient'; 
+import { useRouter } from 'next/navigation'; 
 
 interface AuthContextType {
   user: UserPayload | null;
   token: string | null;
   isLoading: boolean;
-  login: (identifierInput: string, passwordInput: string) => Promise<void>; // Changed usernameInput
+  login: (identifierInput: string, passwordInput: string) => Promise<void>;
   logout: () => void;
   isAuthenticated: () => boolean;
 }
@@ -38,7 +39,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
     } catch (error) {
       console.error("Failed to load auth data from localStorage:", error);
-      // Clear potentially corrupted data
       localStorage.removeItem('authToken');
       localStorage.removeItem('authUser');
     } finally {
@@ -50,25 +50,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     loadAuthData();
   }, [loadAuthData]);
 
-  const login = async (identifierInput: string, passwordInput: string) => { // Changed usernameInput
+  const login = async (identifierInput: string, passwordInput: string) => {
     setIsLoading(true);
     try {
       const response = await apiClient.post<LoginResponse>('/auth/login', {
-        identifier: identifierInput, // Changed from username
+        identifier: identifierInput,
         password: passwordInput,
       });
-      const { token: newToken, user: newUser } = response.data.data!; // Assert data is present on success
+      const { token: newToken, user: newUser } = response.data.data!; 
       
       setToken(newToken);
-      setUser(newUser);
+      setUser(newUser); // newUser is of type UserPayload from common types
       localStorage.setItem('authToken', newToken);
       localStorage.setItem('authUser', JSON.stringify(newUser));
       apiClient.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
-      router.push('/dashboard');
+      // router.push('/dashboard'); // Removed: LoginPage will handle redirect based on state
     } catch (error) {
       console.error("Login failed:", error);
-      // Let UI handle error display through react-query or local state in login form
-      throw error; // Re-throw for the form to catch
+      throw error; 
     } finally {
       setIsLoading(false);
     }
@@ -86,9 +85,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const isAuthenticated = useCallback(() => {
     return !!token && !!user;
   }, [token, user]);
-
-  // Handle token expiry by checking on API calls or using a JWT decode library
-  // For simplicity, this example doesn't include advanced token refresh/expiry logic
 
   return (
     <AuthContext.Provider value={{ user, token, isLoading, login, logout, isAuthenticated }}>

@@ -9,11 +9,11 @@ import {
 } from "@/types";
 import { z } from "zod";
 import { HttpError } from "@/middleware/errorHandler";
-import { getIoInstance } from "@/realtime/socketHandler"; // For emitting events
+import { getIoInstance } from "@/realtime/socketHandler";
 
 export const createMessageSchema = z.object({
   body: z.object({
-    receiverId: z.number().int().positive().optional().nullable(),
+    receiverId: z.string().optional().nullable(), // Receiver ID will be string (e.g., A1234, F5678)
     subject: z.string().min(1, "Subject is required").max(255),
     content: z.string().min(1, "Content is required"),
     type: z.enum(["Broadcast", "Direct"]),
@@ -33,8 +33,9 @@ export const sendMessage = async (
     if (!req.user) throw new HttpError("Unauthorized", 401);
 
     const { receiverId, subject, content, type, priority } = (req as any).body;
-    const senderId = req.user.id;
+    const senderId = req.user.id; // req.user.id is string
 
+    // receiverId from body is already string, messageService expects string. No parseInt needed.
     const messageData = {
       senderId,
       receiverId,
@@ -45,12 +46,11 @@ export const sendMessage = async (
     };
     const newMessage = await messageService.createMessage(messageData);
 
-    // Emit WebSocket event
     const io = getIoInstance();
     if (io) {
       const realtimePayload: RealtimeMessagePayload = {
-        id: newMessage.id.toString(),
-        sender: req.user.username,
+        id: newMessage.id.toString(), // message.id is number (PK of messages table)
+        sender: req.user.name,
         subject: newMessage.subject,
         content: newMessage.content,
         timestamp: newMessage.timestamp,
@@ -63,7 +63,6 @@ export const sendMessage = async (
       if (type === "Broadcast") {
         io.emit("receive:message", realtimePayload);
       } else if (receiverId) {
-        // Emit to specific user room e.g., user:123
         io.to(`user:${receiverId}`).emit("receive:message", realtimePayload);
       }
     }
@@ -88,7 +87,7 @@ export const getMyMessages = async (
     if (!req.user) throw new HttpError("Unauthorized", 401);
     const messages = await messageService.getReceivedMessagesForUser(
       req.user.id
-    );
+    ); // req.user.id is string
     const response: APIResponse<Message[]> = {
       success: true,
       data: messages,
@@ -104,7 +103,7 @@ export const markAsReadSchema = z.object({
     messageId: z.coerce
       .number()
       .int()
-      .positive("Message ID must be a positive integer"),
+      .positive("Message ID must be a positive integer"), // messageId in DB is int
   }),
 });
 
@@ -115,11 +114,13 @@ export const markMessageRead = async (
 ) => {
   try {
     if (!req.user) throw new HttpError("Unauthorized", 401);
-    const { messageId } = (req as any).params as { messageId: string }; // Already validated by Zod
+    const { messageId } = (req as any).params as { messageId: string }; // messageId from param string
+    const numericMessageId = parseInt(messageId, 10); // Convert to number for service
+
     const success = await messageService.markMessageAsRead(
-      parseInt(messageId),
+      numericMessageId,
       req.user.id
-    );
+    ); // req.user.id is string
     if (!success) {
       throw new HttpError(
         "Failed to mark message as read or message not found.",

@@ -19,10 +19,11 @@ const createSchema = async () => {
 
   const createUsersTable = `
     CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      username TEXT UNIQUE NOT NULL,
+      id TEXT PRIMARY KEY NOT NULL, -- Changed from INTEGER PRIMARY KEY AUTOINCREMENT
+      name TEXT NOT NULL,
       passwordHash TEXT NOT NULL,
       email TEXT UNIQUE NOT NULL,
+      profilePictureUrl TEXT,
       departmentId INTEGER, 
       createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
       updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -32,11 +33,22 @@ const createSchema = async () => {
 
   const createStudentsTable = `
     CREATE TABLE IF NOT EXISTS students (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      userId INTEGER UNIQUE NOT NULL,
-      studentRegistrationId TEXT UNIQUE NOT NULL, -- New Field
+      id INTEGER PRIMARY KEY AUTOINCREMENT, -- Internal ID for the student_details row
+      userId TEXT UNIQUE NOT NULL, -- Changed from INTEGER, links to users.id
+      -- studentRegistrationId TEXT UNIQUE NOT NULL, -- REMOVED (now users.id)
       enrollmentDate DATETIME,
-      major TEXT,
+      program TEXT, 
+      branch TEXT, 
+      expectedGraduationYear INTEGER, 
+      currentYearOfStudy INTEGER, 
+      gpa REAL, 
+      academicStatus TEXT, 
+      fatherName TEXT, 
+      motherName TEXT, 
+      dateOfBirth DATE, 
+      phoneNumber TEXT, 
+      permanentAddress TEXT, 
+      currentAddress TEXT, 
       createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
       updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (userId) REFERENCES users (id) ON DELETE CASCADE
@@ -45,24 +57,24 @@ const createSchema = async () => {
 
   const createFacultyTable = `
     CREATE TABLE IF NOT EXISTS faculty (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      userId INTEGER UNIQUE NOT NULL,
-      facultyEmployeeId TEXT UNIQUE NOT NULL, -- New Field
+      id INTEGER PRIMARY KEY AUTOINCREMENT, -- Internal ID
+      userId TEXT UNIQUE NOT NULL, -- Changed from INTEGER, links to users.id
+      -- facultyEmployeeId TEXT UNIQUE NOT NULL, -- REMOVED (now users.id)
       departmentId INTEGER NOT NULL, 
       officeNumber TEXT,
       specialization TEXT,
       createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
       updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (userId) REFERENCES users (id) ON DELETE CASCADE,
-      FOREIGN KEY (departmentId) REFERENCES departments (id) ON DELETE RESTRICT
+      FOREIGN KEY (departmentId) REFERENCES departments (id) ON DELETE RESTRICT 
     );
   `;
 
   const createAdminsTable = `
     CREATE TABLE IF NOT EXISTS admins (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      userId INTEGER UNIQUE NOT NULL,
-      adminEmployeeId TEXT UNIQUE NOT NULL, -- New Field
+      id INTEGER PRIMARY KEY AUTOINCREMENT, -- Internal ID
+      userId TEXT UNIQUE NOT NULL, -- Changed from INTEGER, links to users.id
+      -- adminEmployeeId TEXT UNIQUE NOT NULL, -- REMOVED (now users.id)
       permissionLevel TEXT, 
       createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
       updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -70,11 +82,22 @@ const createSchema = async () => {
     );
   `;
 
-  // New Tables for Enhanced Scheduling
+  const createSuperusersTable = `
+    CREATE TABLE IF NOT EXISTS superusers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, -- Internal ID
+      userId TEXT UNIQUE NOT NULL, -- Changed from INTEGER, links to users.id
+      -- superuserEmployeeId TEXT UNIQUE NOT NULL, -- REMOVED (now users.id)
+      permissions TEXT, -- JSON string for specific permissions
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (userId) REFERENCES users (id) ON DELETE CASCADE
+    );
+  `;
+
   const createCoursesTable = `
     CREATE TABLE IF NOT EXISTS courses (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      courseCode TEXT UNIQUE NOT NULL, -- e.g., CS101
+      courseCode TEXT UNIQUE NOT NULL, 
       courseName TEXT NOT NULL,
       departmentId INTEGER NOT NULL,
       credits INTEGER,
@@ -88,9 +111,9 @@ const createSchema = async () => {
   const createSemestersTable = `
     CREATE TABLE IF NOT EXISTS semesters (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT UNIQUE NOT NULL, -- e.g., "Fall 2024"
+      name TEXT UNIQUE NOT NULL, 
       year INTEGER NOT NULL,
-      term TEXT NOT NULL, -- e.g., "Fall", "Spring", "1"
+      term TEXT NOT NULL, 
       startDate DATE NOT NULL,
       endDate DATE NOT NULL,
       createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -101,29 +124,28 @@ const createSchema = async () => {
   const createSectionsTable = `
     CREATE TABLE IF NOT EXISTS sections (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      sectionCode TEXT NOT NULL, -- e.g., "A", "001"
+      sectionCode TEXT NOT NULL, 
       courseId INTEGER NOT NULL,
       semesterId INTEGER NOT NULL,
-      facultyUserId INTEGER, -- User ID of the faculty teaching this section
-      roomNumber TEXT, -- Default room for the section
+      facultyUserId TEXT, -- Changed from INTEGER, links to users.id
+      roomNumber TEXT, 
       maxCapacity INTEGER,
       createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
       updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (courseId) REFERENCES courses (id) ON DELETE CASCADE,
       FOREIGN KEY (semesterId) REFERENCES semesters (id) ON DELETE CASCADE,
       FOREIGN KEY (facultyUserId) REFERENCES users (id) ON DELETE SET NULL,
-      UNIQUE (courseId, semesterId, sectionCode) -- A course section is unique within a semester
+      UNIQUE (courseId, semesterId, sectionCode)
     );
   `;
 
-  // Modified Schedules Table: Represents individual meeting times for a section
   const createSchedulesTable = `
     CREATE TABLE IF NOT EXISTS schedules (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       sectionId INTEGER NOT NULL,
-      startTime DATETIME NOT NULL, -- Full date and time of the class meeting
-      endTime DATETIME NOT NULL,   -- Full date and time
-      roomNumber TEXT, -- Specific room for this meeting, can override section's default
+      startTime DATETIME NOT NULL, 
+      endTime DATETIME NOT NULL,   
+      roomNumber TEXT, 
       createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
       updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (sectionId) REFERENCES sections (id) ON DELETE CASCADE
@@ -133,7 +155,7 @@ const createSchema = async () => {
   const createStudentEnrollmentsTable = `
     CREATE TABLE IF NOT EXISTS student_section_enrollments (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      studentUserId INTEGER NOT NULL,
+      studentUserId TEXT NOT NULL, -- Changed from INTEGER, links to users.id
       sectionId INTEGER NOT NULL,
       enrollmentDate DATETIME DEFAULT CURRENT_TIMESTAMP,
       grade TEXT,
@@ -141,15 +163,15 @@ const createSchema = async () => {
       updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (studentUserId) REFERENCES users (id) ON DELETE CASCADE,
       FOREIGN KEY (sectionId) REFERENCES sections (id) ON DELETE CASCADE,
-      UNIQUE (studentUserId, sectionId) -- Student can enroll in a section only once
+      UNIQUE (studentUserId, sectionId) 
     );
   `;
 
   const createMessagesTable = `
     CREATE TABLE IF NOT EXISTS messages (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      senderId INTEGER, 
-      receiverId INTEGER, 
+      senderId TEXT, -- Changed from INTEGER, links to users.id (can be null)
+      receiverId TEXT, -- Changed from INTEGER, links to users.id (can be null)
       subject TEXT NOT NULL,
       content TEXT NOT NULL,
       timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -198,6 +220,7 @@ const createSchema = async () => {
         execLog(createStudentsTable, "students");
         execLog(createFacultyTable, "faculty");
         execLog(createAdminsTable, "admins");
+        execLog(createSuperusersTable, "superusers");
         execLog(createCoursesTable, "courses");
         execLog(createSemestersTable, "semesters");
         execLog(createSectionsTable, "sections");
@@ -211,6 +234,7 @@ const createSchema = async () => {
           "students",
           "faculty",
           "admins",
+          "superusers",
           "courses",
           "semesters",
           "sections",
@@ -220,15 +244,14 @@ const createSchema = async () => {
         ];
         let triggersCreated = 0;
         tablesForTriggers.forEach((table) => {
+          // The 'id' column in users is TEXT, but trigger condition `WHERE id = OLD.id` should still work.
           execLog(
             createUpdatedAtTrigger(table),
             `${table} updatedAt trigger`,
             () => {
               triggersCreated++;
               if (triggersCreated === tablesForTriggers.length) {
-                // This is the last operation in this block
                 db.exec("SELECT 1", (err) => {
-                  // Final dummy exec
                   if (err)
                     return reject(
                       new Error(`Finalizing schema error: ${err.message}`)
