@@ -1,4 +1,3 @@
-
 {
   "name": "college-erp-monorepo",
   "version": "1.0.0",
@@ -18,7 +17,7 @@
     "postinstall": "pnpm -r --if-present postinstall"
   },
   "devDependencies": {
-    "typescript": "^5.0.0"
+    "typescript": "^5.8.3"
   },
   "engines": {
     "node": ">=18.0.0",

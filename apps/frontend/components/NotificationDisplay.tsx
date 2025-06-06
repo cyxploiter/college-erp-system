@@ -1,7 +1,7 @@
 
 'use client';
 import React, { useEffect, useRef } from 'react';
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/components/hooks/use-toast";
 import { connectSocket, getSocket } from '@/lib/websocket';
 import { useAuth } from '@/hooks/useAuth';
 import { RealtimeMessagePayload } from '@college-erp/common';

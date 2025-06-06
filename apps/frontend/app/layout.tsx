@@ -1,19 +1,20 @@
 
-import type { Metadata } from "next";
+import type { Metadata } from "next"; // Keep for static metadata
 import { Inter } from "@next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { AppProviders } from "@/providers/AppProviders";
-import Link from "next/link";
-import { Button } from "@/components/ui/button"; // Assuming Shadcn button is added
-import { LogOut, Settings, UserCircle } from "lucide-react"; // Icons
-import { Header } from "@/components/layout/Header"; // Create Header component
+import { AppShell } from "@/components/layout/AppShell"; // Import the new AppShell
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
+// Static metadata for the site
 export const metadata: Metadata = {
   title: "College ERP System",
-  description: "Modern ERP for educational institutions - GitHub Theme",
+  description: "Modern ERP for educational institutions.",
+  icons: {
+    icon: '/favicon.ico', // Example, ensure favicon exists in /public
+  },
 };
 
 export default function RootLayout({
@@ -30,15 +31,7 @@ export default function RootLayout({
         )}
       >
         <AppProviders>
-          <div className="flex flex-col min-h-screen">
-            <Header />
-            <main className="flex-grow container mx-auto px-4 py-6">
-              {children}
-            </main>
-            <footer className="bg-muted text-muted-foreground text-center py-4 border-t border-border text-xs">
-              © {new Date().getFullYear()} College ERP System. All rights reserved.
-            </footer>
-          </div>
+          <AppShell>{children}</AppShell>
         </AppProviders>
       </body>
     </html>

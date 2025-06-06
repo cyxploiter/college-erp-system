@@ -1,10 +1,9 @@
-
-import http from 'http';
-import app from './app';
-import { config } from './config';
-import logger from './utils/logger';
-import { initSocketIO } from './realtime/socketHandler';
-import db from './db/db'; // Import to ensure DB connection is established on start
+import http from "http";
+import app from "./app";
+import { config } from "./config";
+import logger from "./utils/logger";
+import { initSocketIO } from "./realtime/socketHandler";
+import db from "./db/db"; // Import to ensure DB connection is established on start
 
 const PORT = config.PORT || 3001;
 
@@ -20,19 +19,23 @@ httpServer.listen(PORT, () => {
 });
 
 // Graceful shutdown
-const signals = ['SIGINT', 'SIGTERM', 'SIGQUIT'] as const; // Use "as const" for stronger type on signal strings
-signals.forEach(signal => {
-  (process as NodeJS.EventEmitter).on(signal, () => { // Cast to NodeJS.EventEmitter which has .on
+const signals = ["SIGINT", "SIGTERM", "SIGQUIT"] as const; // Use "as const" for stronger type on signal strings
+signals.forEach((signal) => {
+  (process as any).on(signal, () => {
+    // Use process.on directly
     logger.info(`Received ${signal}, shutting down gracefully...`);
     httpServer.close(() => {
-      logger.info('HTTP server closed.');
+      logger.info("HTTP server closed.");
       db.close((err) => {
         if (err) {
-          logger.error('Error closing database connection during shutdown:', err.message);
+          logger.error(
+            "Error closing database connection during shutdown:",
+            err.message
+          );
         } else {
-          logger.info('Database connection closed.');
+          logger.info("Database connection closed.");
         }
-        (process as { exit: (code?: number) => void }).exit(0);
+        (process as any).exit(0); // Use process.exit directly
       });
     });
   });

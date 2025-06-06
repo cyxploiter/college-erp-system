@@ -1,4 +1,3 @@
-
 'use client';
 import React, { createContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { UserPayload, LoginResponse } from '@college-erp/common';
@@ -9,7 +8,7 @@ interface AuthContextType {
   user: UserPayload | null;
   token: string | null;
   isLoading: boolean;
-  login: (username: string, pass: string) => Promise<void>;
+  login: (identifierInput: string, passwordInput: string) => Promise<void>; // Changed usernameInput
   logout: () => void;
   isAuthenticated: () => boolean;
 }
@@ -51,11 +50,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     loadAuthData();
   }, [loadAuthData]);
 
-  const login = async (usernameInput: string, passwordInput: string) => {
+  const login = async (identifierInput: string, passwordInput: string) => { // Changed usernameInput
     setIsLoading(true);
     try {
       const response = await apiClient.post<LoginResponse>('/auth/login', {
-        username: usernameInput,
+        identifier: identifierInput, // Changed from username
         password: passwordInput,
       });
       const { token: newToken, user: newUser } = response.data.data!; // Assert data is present on success

@@ -2,7 +2,7 @@
 'use client';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { LogOut, Settings, UserCircle, LayoutDashboard, CalendarDays, MessageSquare, Users, BookOpen } from 'lucide-react';
+import { LogOut, Settings, UserCircle, Menu, X } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import {
   DropdownMenu,
@@ -14,67 +14,72 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { usePathname } from 'next/navigation';
-import { cn } from '@/lib/utils';
+import React from 'react';
 
-const navItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['student', 'faculty', 'admin'] },
-  { href: '/schedules', label: 'My Schedule', icon: CalendarDays, roles: ['student', 'faculty'] },
-  { href: '/messages', label: 'Messages', icon: MessageSquare, roles: ['student', 'faculty', 'admin'] },
-  // Admin specific links
-  { href: '/admin/users', label: 'Manage Users', icon: Users, roles: ['admin'] },
-  { href: '/admin/schedules', label: 'Manage Schedules', icon: BookOpen, roles: ['admin'] },
-];
+// CollegeIcon can be moved to a shared icons file if used elsewhere
+const CollegeIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg fill="currentColor" viewBox="0 0 20 20" {...props}>
+    <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3.5a1 1 0 00.002 1.792l7 3.5a1 1 0 00.786 0l7-3.5a1 1 0 00.002-1.792l-7-3.5zM3 9V17a1 1 0 001 1h12a1 1 0 001-1V9l-7 3.5L3 9z"></path>
+  </svg>
+);
 
-export function Header() {
+interface HeaderProps {
+  onMobileMenuToggle: () => void;
+  isMobileMenuOpen: boolean; 
+}
+
+export function Header({ onMobileMenuToggle, isMobileMenuOpen }: HeaderProps) {
   const { user, logout, isAuthenticated } = useAuth();
   const pathname = usePathname();
 
   const getInitials = (name?: string) => {
     if (!name) return 'U';
     const parts = name.split(' ');
+    let initials = parts[0]?.[0] || '';
     if (parts.length > 1) {
-      return parts[0][0].toUpperCase() + parts[parts.length - 1][0].toUpperCase();
+      initials += parts[parts.length - 1]?.[0] || '';
+    } else if (name.length > 1 && parts[0].length > 1) {
+      initials = name.substring(0, 2);
+    } else if (initials === '') { 
+        initials = name.substring(0,1) || 'U';
     }
-    return name.substring(0, 2).toUpperCase();
+    return initials.toUpperCase();
   };
 
+
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-14 items-center">
-        <Link href={isAuthenticated() ? "/dashboard" : "/login"} className="mr-6 flex items-center space-x-2">
-          {/* <CollegeIcon className="h-6 w-6 text-primary" /> */}
-          <span className="font-bold text-lg text-foreground hover:text-primary transition-colors">CollegeERP</span>
+    <header className="sticky top-0 z-40 w-full border-b border-border bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/75 shadow-header">
+      <div className="container flex h-16 items-center px-4 sm:px-6">
+        {/* Mobile Menu Toggle - visible on small screens, triggers sidebar */}
+        {isAuthenticated() && user && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onMobileMenuToggle}
+            className="md:hidden mr-2 shrink-0"
+            aria-label="Toggle sidebar"
+          >
+            {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+          </Button>
+        )}
+        
+        <Link href={isAuthenticated() ? "/dashboard" : "/login"} className="mr-4 md:mr-6 flex items-center space-x-2 shrink-0">
+          <CollegeIcon className="h-7 w-7 text-primary" />
+          <span className="font-bold text-lg sm:text-xl text-foreground hover:text-primary transition-colors">CollegeERP</span>
         </Link>
         
-        {isAuthenticated() && user && (
-          <nav className="flex items-center space-x-1 lg:space-x-2 flex-1">
-            {navItems.filter(item => item.roles.includes(user.role)).map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "px-3 py-2 text-sm font-medium rounded-md transition-colors",
-                  pathname === item.href
-                    ? "bg-muted text-primary"
-                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
-                )}
-              >
-                <item.icon className="inline-block h-4 w-4 mr-1.5 relative -top-px" />
-                {item.label}
-              </Link>
-            ))}
-          </nav>
-        )}
+        {/* Spacer to push profile menu to the right */}
+        <div className="flex-1" /> 
 
-        <div className="flex flex-1 items-center justify-end space-x-4">
+        <div className="flex items-center space-x-2 sm:space-x-3">
           {isAuthenticated() && user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={`https://avatars.githubusercontent.com/${user.username}?size=32`} alt={user.username} />
-                    <AvatarFallback>{getInitials(user.username)}</AvatarFallback>
-                  </Avatar>
+                <Button variant="ghost" className="relative h:10 w:10 rounded-full">
+                  <Avatar className="h-full w-full border border-transparent group-hover:border-primary transition-colors">
+                    <AvatarImage src={`https://ui-avatars.com/api/?name=${encodeURIComponent(user?.username || 'U')}&background=3B82F6&color=FFFFFF&size=128`} alt={user?.username} />
+                                    <AvatarFallback className="text-3xl bg-muted text-muted-foreground">{getInitials(user?.username)}</AvatarFallback>
+                                      </Avatar>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-56" align="end" forceMount>
@@ -96,7 +101,7 @@ export function Header() {
                   <span>Settings</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={logout}>
+                <DropdownMenuItem onClick={logout} className="text-destructive focus:bg-destructive/90 focus:text-destructive-foreground">
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>Log out</span>
                 </DropdownMenuItem>
@@ -114,10 +119,3 @@ export function Header() {
     </header>
   );
 }
-
-// Placeholder for CollegeIcon if you have one
-// const CollegeIcon = (props: React.SVGProps<SVGSVGElement>) => (
-//   <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
-//     <path d="M12 2L1 9l11 7 11-7L12 2zm0 10.84L3.16 9 12 4.16 20.84 9 12 12.84zM5 11.18V17h14v-5.82l-7 4.45-7-4.45z"/>
-//   </svg>
-// );

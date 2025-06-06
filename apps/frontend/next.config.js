@@ -1,17 +1,17 @@
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  transpilePackages: ['@college-erp/common'], // Ensure common package is transpiled
+  transpilePackages: ["@college-erp/common"], // Ensure common package is transpiled
   images: {
     remotePatterns: [
       {
-        protocol: 'https',
-        hostname: 'picsum.photos',
+        protocol: "https",
+        hostname: "picsum.photos",
       },
       {
-        protocol: 'https',
-        hostname: 'avatars.githubusercontent.com', // For potential avatar placeholders
+        // Added for ui-avatars.com
+        protocol: "https",
+        hostname: "ui-avatars.com",
       },
     ],
   },

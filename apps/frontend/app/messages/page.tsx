@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; // Assuming added
-import { useToast } from "@/components/hooks/use-toast"; // Assuming added
+import { useToast } from "@/components/hooks/use-toast";
 import { format } from 'date-fns';
 import { Inbox, Send, AlertCircle, Edit3, Eye, Trash2, Users, CheckCircle } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -28,17 +28,12 @@ const fetchMessages = async (): Promise<Message[]> => {
 };
 
 // For admin/faculty to send messages, they might need a list of users
-const fetchUsers = async (): Promise<UserPayload[]> => {
-    // This endpoint might not exist or might need admin rights.
-    // For now, assuming it exists for users with roles 'admin' or 'faculty'.
-    // A more realistic endpoint might be '/users' or '/users?role=student&role=faculty' etc.
-    // The provided backend has /api/users/me, and no /api/users/all by default for non-admins.
-    // We will assume there's an endpoint like '/users/list-for-messaging' or similar.
-    // Or, this could be fetched from a more specific admin endpoint if only admin can see all users.
-    // For simplicity, let's use a hypothetical endpoint or assume it's handled.
-    // If '/users/all' isn't available or protected, this query will fail for non-admins.
-    // Let's assume an endpoint '/api/users/contact-list' that returns users one can message.
-    const response = await apiClient.get<{data: UserPayload[]}>('/users/all-detailed'); // Using the same one as admin/users page
+const fetchUsersForMessaging = async (): Promise<UserPayload[]> => {
+    // Use the admin endpoint that lists all users. UserPayload is sufficient for listing.
+    // Access to this endpoint is controlled by backend authorization ('admin' role).
+    // Faculty might need a different endpoint or filtered list if they can't see all users.
+    // For now, assuming admin/faculty have access to /users for recipient selection.
+    const response = await apiClient.get<{data: UserPayload[]}>('/users'); 
     return response.data.data;
 };
 
@@ -65,10 +60,10 @@ export default function MessagesPage() {
   });
 
   // Only fetch users if admin/faculty for composing messages
-  const { data: users, isLoading: usersLoading } = useQuery<UserPayload[], Error>({
-    queryKey: ['allUsersForMessaging'],
-    queryFn: fetchUsers,
-    enabled: (user?.role === 'admin' || user?.role === 'faculty') && isComposeOpen, // Fetch only when needed and authorized
+  const { data: usersForSelect, isLoading: usersLoading } = useQuery<UserPayload[], Error>({
+    queryKey: ['usersForMessagingList'],
+    queryFn: fetchUsersForMessaging,
+    enabled: (user?.role === 'admin' || user?.role === 'faculty') && isComposeOpen, 
   });
 
   const messageForm = useForm<MessageFormValues>({
@@ -127,8 +122,7 @@ export default function MessagesPage() {
 
   const handleViewMessage = (message: Message) => {
     setSelectedMessage(message);
-    // Mark as read only if it's a direct message to the current user and unread
-    if (!message.isRead && message.type === 'Direct' && message.receiverId === user?.id) { 
+    if (!message.isRead && (message.receiverId === user?.id || message.type === 'Broadcast')) { // Also mark broadcast as "read" visually for current user locally
       markAsReadMutation.mutate(message.id);
     }
   };
@@ -145,7 +139,7 @@ export default function MessagesPage() {
     switch(priority) {
         case 'Critical': return 'border-destructive text-destructive';
         case 'Urgent': return 'border-yellow-500 text-yellow-600'; 
-        default: return 'border-primary/50 text-primary'; // Adjusted for better visibility
+        default: return 'border-primary/50 text-primary';
     }
   };
 
@@ -159,7 +153,7 @@ export default function MessagesPage() {
                 Messages
             </h1>
             {(user?.role === 'admin' || user?.role === 'faculty') && (
-              <Button onClick={() => setIsComposeOpen(true)}>
+              <Button onClick={() => { messageForm.reset({ type: 'Direct', priority: 'Normal' }); setIsComposeOpen(true); }}>
                 <Edit3 className="mr-2 h-4 w-4" /> Compose Message
               </Button>
             )}
@@ -181,18 +175,18 @@ export default function MessagesPage() {
                 {error && <div className="text-destructive bg-destructive/10 p-3 rounded-md flex items-center"><AlertCircle className="mr-2 h-5 w-5" /> Error: {error.message}</div>}
                 {!isLoading && messages && messages.length === 0 && <p className="text-muted-foreground py-4 text-center">Your inbox is empty.</p>}
                 {!isLoading && messages && messages.length > 0 && (
-                  <ul className="space-y-3">
+                  <ul className="space-y-3 max-h-[60vh] overflow-y-auto pr-2 scrollbar-thin">
                     {messages.map((msg) => (
                       <li key={msg.id} 
                           className={cn(
                             "p-3 rounded-md border transition-all hover:shadow-sm cursor-pointer flex justify-between items-start",
-                            (msg.isRead && msg.type === 'Direct') || msg.type === 'Broadcast' ? "bg-card border-border" : "bg-primary/5 border-primary/30 font-medium",
+                            (msg.isRead && msg.receiverId === user?.id ) || msg.type === 'Broadcast' ? "bg-card border-border" : "bg-primary/5 border-primary/30 font-medium",
                             selectedMessage?.id === msg.id && "ring-2 ring-primary shadow-lg"
                           )}
                           onClick={() => handleViewMessage(msg)}>
                         <div className="flex-grow">
                           <div className="flex justify-between items-center">
-                            <span className={cn("text-sm font-semibold", (!msg.isRead && msg.type === 'Direct' && msg.receiverId === user?.id) ? "text-primary" : "text-foreground")}>
+                            <span className={cn("text-sm font-semibold", (!msg.isRead && msg.receiverId === user?.id && msg.type==='Direct') ? "text-primary" : "text-foreground")}>
                                 {msg.type === 'Broadcast' && <Users className="inline h-4 w-4 mr-1.5 text-muted-foreground relative -top-px" />}
                                 {msg.subject}
                             </span>
@@ -217,8 +211,7 @@ export default function MessagesPage() {
           </TabsContent>
         </Tabs>
 
-        {/* Compose Message Dialog */}
-        <Dialog open={isComposeOpen} onOpenChange={setIsComposeOpen}>
+        <Dialog open={isComposeOpen} onOpenChange={(open) => { setIsComposeOpen(open); if (!open) messageForm.reset();}}>
           <DialogContent className="sm:max-w-[525px]">
             <DialogHeader>
               <DialogTitle>Compose New Message</DialogTitle>
@@ -233,7 +226,7 @@ export default function MessagesPage() {
                     name="type"
                     control={messageForm.control}
                     render={({ field }) => (
-                        <Select onValueChange={(value) => {field.onChange(value); if(value === 'Broadcast') messageForm.setValue('receiverId', null);}} defaultValue={field.value}>
+                        <Select onValueChange={(value) => {field.onChange(value); if(value === 'Broadcast') messageForm.setValue('receiverId', null);}} value={field.value}>
                             <SelectTrigger id="type" className="w-full mt-1">
                                 <SelectValue placeholder="Select message type" />
                             </SelectTrigger>
@@ -253,15 +246,15 @@ export default function MessagesPage() {
                         name="receiverId"
                         control={messageForm.control}
                         render={({ field }) => (
-                            <Select onValueChange={field.onChange} defaultValue={field.value || undefined}>
-                                <SelectTrigger id="receiverId" className="w-full mt-1" disabled={usersLoading || !users}>
+                            <Select onValueChange={field.onChange} value={field.value || undefined}>
+                                <SelectTrigger id="receiverId" className="w-full mt-1" disabled={usersLoading || !usersForSelect}>
                                     <SelectValue placeholder={usersLoading? "Loading users..." : "Select recipient"} />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {users?.filter(u => u.id !== user?.id).map(u => ( 
+                                    {usersForSelect?.filter(u => u.id !== user?.id).map(u => ( 
                                         <SelectItem key={u.id} value={String(u.id)}>{u.username} ({u.role})</SelectItem>
                                     ))}
-                                     {!usersLoading && (!users || users.filter(u => u.id !== user?.id).length === 0) && <p className="p-2 text-xs text-muted-foreground">No users available to message.</p>}
+                                     {!usersLoading && (!usersForSelect || usersForSelect.filter(u => u.id !== user?.id).length === 0) && <p className="p-2 text-xs text-muted-foreground">No users available to message.</p>}
                                 </SelectContent>
                             </Select>
                         )}
@@ -288,7 +281,7 @@ export default function MessagesPage() {
                     name="priority"
                     control={messageForm.control}
                     render={({ field }) => (
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value}>
                             <SelectTrigger id="priority" className="w-full mt-1">
                                 <SelectValue placeholder="Select priority" />
                             </SelectTrigger>

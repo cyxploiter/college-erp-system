@@ -3,6 +3,9 @@ import { config } from "@/config";
 import logger from "@/utils/logger";
 import path from "path";
 
+// Declare Node.js global for TypeScript
+declare const __dirname: string;
+
 const verboseSqlite3 = sqlite3.verbose();
 
 // Construct the absolute path to the database file
@@ -17,7 +20,7 @@ logger.info(`Database path: ${dbPath}`);
 const db = new verboseSqlite3.Database(dbPath, (err) => {
   if (err) {
     logger.error("Could not connect to database", err);
-    (process as { exit: (code?: number) => void }).exit(1); // Exit if DB connection fails
+    (process as any).exit(1); // Use process.exit directly
   } else {
     logger.info("Connected to SQLite database");
     // Enable foreign key support

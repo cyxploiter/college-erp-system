@@ -16,61 +16,63 @@ export default function ProfilePage() {
   const getInitials = (name?: string) => {
     if (!name) return 'U';
     const parts = name.split(' ');
+    let initials = parts[0][0] || '';
     if (parts.length > 1) {
-      return parts[0][0].toUpperCase() + parts[parts.length - 1][0].toUpperCase();
+      initials += parts[parts.length - 1][0] || '';
+    } else if (name.length > 1) {
+      initials = name.substring(0, 2);
     }
-    return name.substring(0, 2).toUpperCase();
+    return initials.toUpperCase();
   };
 
   return (
     <ProtectedRoute>
-      <div className="space-y-6 max-w-2xl mx-auto">
-        <div className="flex items-center justify-between">
-            <h1 className="text-3xl font-bold text-foreground flex items-center">
-                <UserCircle className="mr-3 h-8 w-8 text-primary" />
+      <div className="space-y-6 max-w-3xl mx-auto">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground flex items-center">
+                <UserCircle className="mr-3 h-7 w-7 sm:h-8 sm:w-8 text-primary" />
                 My Profile
             </h1>
-            <Button variant="outline" disabled>
+            <Button variant="outline" disabled className="w-full sm:w-auto">
                 <Edit className="mr-2 h-4 w-4" /> Edit Profile (Soon)
             </Button>
         </div>
 
-        <Card className="shadow-md">
-          <CardHeader>
-            <div className="flex items-center space-x-4">
-              <Avatar className="h-20 w-20 border-2 border-primary">
-                <AvatarImage src={`https://avatars.githubusercontent.com/${user?.username}?size=80`} alt={user?.username} />
-                <AvatarFallback className="text-2xl bg-muted text-muted-foreground">{getInitials(user?.username)}</AvatarFallback>
+        <Card className="shadow-lg border-border">
+          <CardHeader className="pb-4">
+            <div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-6">
+              <Avatar className="h-24 w-24 sm:h-28 sm:w-28 border-2 border-primary shadow-md">
+                <AvatarImage src={`https://ui-avatars.com/api/?name=${encodeURIComponent(user?.username || 'U')}&background=3B82F6&color=FFFFFF&size=128`} alt={user?.username} />
+                <AvatarFallback className="text-3xl bg-muted text-muted-foreground">{getInitials(user?.username)}</AvatarFallback>
               </Avatar>
-              <div>
-                <CardTitle className="text-2xl text-foreground">{user?.username}</CardTitle>
-                <CardDescription className="text-muted-foreground">Role: {user?.role}</CardDescription>
+              <div className="text-center sm:text-left">
+                <CardTitle className="text-2xl sm:text-3xl text-foreground">{user?.username}</CardTitle>
+                <CardDescription className="text-base text-muted-foreground mt-1">Role: <span className="font-medium text-primary">{user?.role}</span></CardDescription>
               </div>
             </div>
           </CardHeader>
-          <CardContent className="space-y-6 pt-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <CardContent className="space-y-6 pt-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
               <div>
                 <Label htmlFor="username" className="text-sm font-medium text-muted-foreground">Username</Label>
-                <Input id="username" value={user?.username || ''} readOnly disabled className="mt-1 bg-muted/50 cursor-not-allowed"/>
+                <Input id="username" value={user?.username || ''} readOnly disabled className="mt-1 bg-muted/70 border-transparent cursor-not-allowed focus-visible:ring-0 focus-visible:ring-offset-0"/>
               </div>
               <div>
                 <Label htmlFor="email" className="text-sm font-medium text-muted-foreground">Email Address</Label>
-                <Input id="email" type="email" value={user?.email || ''} readOnly disabled className="mt-1 bg-muted/50 cursor-not-allowed"/>
+                <Input id="email" type="email" value={user?.email || ''} readOnly disabled className="mt-1 bg-muted/70 border-transparent cursor-not-allowed focus-visible:ring-0 focus-visible:ring-offset-0"/>
               </div>
             </div>
             <div>
-                <Label htmlFor="role" className="text-sm font-medium text-muted-foreground">Role</Label>
-                <Input id="role" value={user?.role || ''} readOnly disabled className="mt-1 bg-muted/50 cursor-not-allowed"/>
+                <Label htmlFor="roleDisplay" className="text-sm font-medium text-muted-foreground">Role</Label>
+                <Input id="roleDisplay" value={user?.role?.charAt(0).toUpperCase() + user?.role?.slice(1) || ''} readOnly disabled className="mt-1 bg-muted/70 border-transparent cursor-not-allowed capitalize focus-visible:ring-0 focus-visible:ring-offset-0"/>
             </div>
-            {/* Add more profile fields here as needed, e.g., department, join date etc. */}
-            {/* These would typically come from a more detailed user profile API endpoint */}
-             <div className="border-t border-border pt-6 mt-6">
-                <h3 className="text-lg font-semibold text-foreground mb-2">Account Information</h3>
-                <p className="text-sm text-muted-foreground">
-                    Joined: N/A (Placeholder - fetch from user details) <br />
-                    Last Login: N/A (Placeholder)
-                </p>
+            
+             <div className="border-t border-border pt-6 mt-2">
+                <h3 className="text-lg font-semibold text-foreground mb-3">Account Information</h3>
+                <div className="space-y-2 text-sm text-muted-foreground">
+                    <p><span className="font-medium text-foreground/90">Joined:</span> N/A (Feature to be added)</p>
+                    <p><span className="font-medium text-foreground/90">Last Login:</span> N/A (Feature to be added)</p>
+                </div>
             </div>
           </CardContent>
         </Card>

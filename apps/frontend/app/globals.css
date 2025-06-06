@@ -1,97 +1,144 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* GitHub inspired theme variables for Shadcn UI */
+/* Modern Theme Variables for Shadcn UI */
 @layer base {
   :root {
-    /* GitHub Official Colors - Light Theme */
-    --background: 0 0% 100%; /* #FFFFFF */
-    --foreground: 215 14% 16%; /* #24292F - GitHub's primary text color */
+    /* Light Theme Palette */
+    --background: 220 17% 98%;
+    /* #F8F9FA - Very light gray */
+    --foreground: 220 40% 15%;
+    /* #1F2937 - Dark gray */
 
-    --card: 0 0% 100%; /* #FFFFFF - like GitHub's main content cards */
-    --card-foreground: 215 14% 16%; /* #24292F */
+    --card: 0 0% 100%;
+    /* #FFFFFF - White */
+    --card-foreground: 220 40% 15%;
+    /* #1F2937 */
 
-    --popover: 0 0% 100%; /* #FFFFFF */
-    --popover-foreground: 215 14% 16%; /* #24292F */
+    --popover: 0 0% 100%;
+    /* #FFFFFF */
+    --popover-foreground: 220 40% 15%;
+    /* #1F2937 */
 
-    --primary: 215 97.4% 44.9%; /* #0969DA - GitHub Blue */
-    --primary-foreground: 210 16.7% 97.3%; /* #F6F8FA - Light gray for text on primary */
-    
-    --secondary: 210 16.7% 97.3%; /* Using --muted for secondary bg #F6F8FA */
-    --secondary-foreground: 215 14% 16%; /* --foreground for text on secondary */
+    --primary: 217 91% 60%;
+    /* #3B82F6 - Modern Blue */
+    --primary-foreground: 0 0% 100%;
+    /* #FFFFFF */
 
-    --muted: 210 16.7% 97.3%; /* #F6F8FA - For subtle background elements */
-    --muted-foreground: 214 7% 43.4%; /* #636C76 - Lighter gray text for muted elements */
+    --secondary: 220 17% 93%;
+    /* #E5E7EB - Light Gray (e.g., for secondary buttons) */
+    --secondary-foreground: 220 40% 15%;
+    /* #1F2937 - Dark text on light gray */
 
-    --accent: 210 16.7% 97.3%; /* #F6F8FA - For hover/active backgrounds of secondary elements (can be adjusted) */
-    --accent-foreground: 215 14% 16%; /* --foreground */
+    --muted: 220 17% 96%;
+    /* #F3F4F6 - Lighter Gray (for muted backgrounds, inputs) */
+    --muted-foreground: 220 10% 45%;
+    /* #6B7280 - Medium Gray (for muted text) */
 
-    --destructive: 356 71.4% 47.3%; /* #CF222E - GitHub Red (using a slightly more accurate HSL for the hex) */
-                                      /* Prompt's HSL: 356 71.4% 59% - if this is preferred, use it */
-    /* --destructive: 356 71.4% 59%; */ /* Using prompt's HSL for destructive */
-    --destructive-foreground: 210 16.7% 97.3%; /* #F6F8FA */
+    --accent: 220 17% 93%;
+    /* #E5E7EB - Hover on muted elements */
+    --accent-foreground: 220 40% 15%;
+    /* Dark text for accent */
 
-    --success: 148 62.1% 40.8%; /* #2DA44E - GitHub Green */
-    --success-foreground: 210 16.7% 97.3%; /* #F6F8FA */
+    --destructive: 0 84% 60%;
+    /* #EF4444 - Modern Red */
+    --destructive-foreground: 0 0% 100%;
+    /* #FFFFFF */
 
-    --border: 210 14% 84.1%; /* #D0D7DE - Light gray for borders */
-    --input: 210 14% 84.1%; /* #D0D7DE - Same as border for GitHub style */
-    --ring: 215 97.4% 44.9%; /* #0969DA - Primary blue for focus rings */
+    --success: 145 63% 49%;
+    /* #10B981 - Modern Green */
+    --success-foreground: 0 0% 100%;
+    /* #FFFFFF */
 
-    --radius: 0.375rem; /* default 6px like GitHub */
+    --border: 220 13% 86%;
+    /* #D1D5DB - Light Gray Border */
+    --input: 220 13% 86%;
+    /* Input border, background can be --background or --card */
+    --ring: 217 91% 60%;
+    /* Primary color for focus rings */
+
+    --radius: 0.5rem;
+    /* Default border radius (8px) */
   }
 
-  /* Minimal dark theme (can be expanded later) */
   .dark {
-    /* Example dark theme based on GitHub Dark - adjust as needed */
-    --background: 220 13% 10%; /* approx #161B22 */
-    --foreground: 210 20% 85%; /* approx #C9D1D9 */
+    /* Dark Theme Palette */
+    --background: 220 30% 10%;
+    /* #111827 - Very Dark Gray */
+    --foreground: 220 20% 90%;
+    /* #D1D5DB - Light Gray Text */
 
-    --card: 220 13% 13%; /* approx #1C2128 */
-    --card-foreground: 210 20% 85%;
+    --card: 220 25% 15%;
+    /* #1F2937 - Dark Gray */
+    --card-foreground: 220 20% 90%;
+    /* #D1D5DB */
 
-    --popover: 220 13% 13%;
-    --popover-foreground: 210 20% 85%;
+    --popover: 220 25% 15%;
+    /* #1F2937 */
+    --popover-foreground: 220 20% 90%;
+    /* #D1D5DB */
 
-    --primary: 212 92% 58%; /* approx #388BFD */
-    --primary-foreground: 220 13% 10%; /* Dark text on light blue */
-    
-    --secondary: 220 10% 20%; /* approx #2A3037 */
-    --secondary-foreground: 210 20% 85%;
+    --primary: 217 91% 65%;
+    /* #60A5FA - Lighter Blue for Dark Mode */
+    --primary-foreground: 220 30% 5%;
+    /* #0B101A - Very dark text on primary */
 
-    --muted: 220 10% 15%; /* approx #21262D */
-    --muted-foreground: 212 10% 55%; /* approx #8B949E */
+    --secondary: 220 20% 25%;
+    /* #374151 - Medium Dark Gray */
+    --secondary-foreground: 220 20% 90%;
+    /* #D1D5DB */
 
-    --accent: 220 10% 20%;
-    --accent-foreground: 210 20% 85%;
+    --muted: 220 20% 20%;
+    /* #2B3442 approx - Muted Background */
+    --muted-foreground: 220 15% 60%;
+    /* #9CA3AF - Muted Text */
 
-    --destructive: 356 78% 63%; /* approx #F85149 */
-    --destructive-foreground: 220 13% 10%;
+    --accent: 220 20% 25%;
+    /* #374151 */
+    --accent-foreground: 220 20% 90%;
+    /* #D1D5DB */
 
-    --success: 139 55% 50%; /* approx #3FB950 */
-    --success-foreground: 220 13% 10%;
+    --destructive: 0 72% 51%;
+    /* #F43F5E - Rose 500 */
+    --destructive-foreground: 0 0% 100%;
+    /* White */
 
-    --border: 216 10% 25%; /* approx #30363D */
-    --input: 216 10% 25%;
-    --ring: 212 92% 58%;
+    --success: 145 58% 55%;
+    /* #22C55E - Green 500 */
+    --success-foreground: 0 0% 100%;
+    /* White */
+
+    --border: 220 20% 30%;
+    /* #4B5563 - Darker Border */
+    --input: 220 20% 30%;
+    /* Input border, background typically --card or similar */
+    --ring: 217 91% 65%;
+    /* Primary color for focus rings */
   }
 }
 
 @layer base {
   * {
     @apply border-border;
+    /* Apply base border color */
   }
+
   body {
     @apply bg-background text-foreground;
-    font-feature-settings: "rlig" 1, "calt" 1; /* Enable common ligatures */
+    font-feature-settings: "rlig" 1, "calt" 1;
+    /* Enable common ligatures */
+    @apply antialiased;
+    /* Smoother fonts */
   }
-  /* GitHub-like link styling */
+
+  /* Modern link styling */
   a {
-    @apply text-primary hover:underline;
+    @apply text-primary hover:text-primary/80 transition-colors duration-150;
+    /* Slightly dimmed primary on hover */
   }
-  /* Input and Button base styles for GitHub feel */
+
+  /* Input and Button base styles for a modern feel */
   input[type="text"],
   input[type="password"],
   input[type="email"],
@@ -99,35 +146,110 @@
   input[type="number"],
   textarea,
   select {
-     @apply bg-background border border-input rounded-md px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
-     /* GitHub input specific shadow on focus */
-     @apply focus-visible:shadow-[0_0_0_3px_rgba(9,105,218,0.3)]; /* Equivalent to primary ring color with alpha */
-  }
-   /* For Shadcn UI form components to pick up GitHub specific styles */
-  .shadcn-input { /* Add this class to Shadcn Input components if default isn't picking up focus shadow */
-     @apply focus-visible:shadow-[0_0_0_3px_rgba(9,105,218,0.3)];
+    @apply bg-card border border-input rounded-md px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
+    /* Modern input focus style */
+    @apply focus-visible:border-primary;
+    /* Change border color on focus */
   }
 
-  h1,h2,h3,h4,h5,h6 {
-    @apply font-semibold text-foreground;
+  /* For Shadcn UI form components to pick up theme specific styles */
+  .shadcn-input {
+    /* Add this class to Shadcn Input components if default isn't picking up focus style */
+    @apply focus-visible:border-primary;
   }
-  h1 { @apply text-2xl; } /* GitHub h1 is often around 24px-26px semibold */
-  h2 { @apply text-xl; } /* GitHub h2 is often around 20px-22px semibold */
 
-  /* Basic scrollbar styling (optional, for a more GitHub-like feel on WebKit) */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-semibold text-foreground tracking-tight;
+    /* Add tight tracking for headings */
+  }
+
+  h1 {
+    @apply text-2xl md:text-3xl;
+  }
+
+  h2 {
+    @apply text-xl md:text-2xl;
+  }
+
+  h3 {
+    @apply text-lg md:text-xl;
+  }
+
+
+  /* Modern, subtle scrollbar styling (optional) */
   ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 10px;
+    height: 10px;
   }
+
   ::-webkit-scrollbar-track {
-    background: hsl(var(--muted) / 0.5);
-    border-radius: 10px;
+    background: hsl(var(--background));
+    /* Or var(--muted) for slight contrast */
   }
+
   ::-webkit-scrollbar-thumb {
     background: hsl(var(--border));
-    border-radius: 10px;
+    border-radius: var(--radius);
+    border: 2px solid hsl(var(--background));
+    /* Creates padding around thumb */
   }
+
   ::-webkit-scrollbar-thumb:hover {
     background: hsl(var(--muted-foreground));
   }
+}
+
+/* Custom scrollbar utility classes for specific elements */
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+    /* thumb track */
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--border));
+    border-radius: 3px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--muted-foreground));
+  }
+
+  /* Variant for use on darker backgrounds if needed */
+  .dark .scrollbar-thin {
+    scrollbar-color: hsl(var(--border)) transparent;
+    /* thumb track in dark mode */
+  }
+
+  .dark .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--border));
+    /* thumb color in dark mode */
+  }
+
+  .dark .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--muted-foreground));
+    /* thumb hover color in dark mode */
+  }
+}
+
+/* Tailwind CSS utility for transitioning margin/padding (spacing) */
+/* Not directly available, but transitions on width/height are. */
+/* For margin/padding, ensure the parent or element itself has transition-all or specific transition properties. */
+.transition-spacing {
+  transition-property: margin, padding;
 }

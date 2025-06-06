@@ -1,73 +1,72 @@
-
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   darkMode: ["class"], // For next-themes
   content: [
-    './pages/**/*.{ts,tsx}',
-    './components/**/*.{ts,tsx}',
-    './app/**/*.{ts,tsx}',
-    './src/**/*.{ts,tsx}',
+    "./pages/**/*.{ts,tsx}",
+    "./components/**/*.{ts,tsx}",
+    "./app/**/*.{ts,tsx}",
+    "./src/**/*.{ts,tsx}",
   ],
   prefix: "", // No prefix for Shadcn UI
   theme: {
     container: {
       center: true,
-      padding: "2rem",
+      padding: "1rem", // Adjusted for better responsiveness
       screens: {
-        "2xl": "1400px",
+        sm: "640px",
+        md: "768px",
+        lg: "1024px",
+        xl: "1280px",
+        "2xl": "1400px", // Max container width
       },
     },
     extend: {
       colors: {
-        border: "hsl(var(--border))", // #D0D7DE -> 210 14% 84.1%
-        input: "hsl(var(--input))", // #D0D7DE -> 210 14% 84.1% (same as border for GitHub style)
-        ring: "hsl(var(--ring))", // #0969DA -> 215 97.4% 44.9% (focus ring, primary blue)
-        background: "hsl(var(--background))", // #FFFFFF -> 0 0% 100%
-        foreground: "hsl(var(--foreground))", // #24292F -> 215 14% 16%
+        border: "hsl(var(--border))",
+        input: "hsl(var(--input))", // For input borders, background might be different
+        ring: "hsl(var(--ring))", // Focus ring color
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
         primary: {
-          DEFAULT: "hsl(var(--primary))", // #0969DA -> 215 97.4% 44.9%
-          foreground: "hsl(var(--primary-foreground))", // #F6F8FA -> 210 16.7% 97.3%
+          DEFAULT: "hsl(var(--primary))",
+          foreground: "hsl(var(--primary-foreground))",
         },
-        secondary: { // Using GitHub's gray button style as secondary
-          DEFAULT: "hsl(var(--muted))", // #F6F8FA
-          foreground: "hsl(var(--foreground))", // Text color on gray buttons is usually dark
+        secondary: {
+          DEFAULT: "hsl(var(--secondary))",
+          foreground: "hsl(var(--secondary-foreground))",
         },
         destructive: {
-          DEFAULT: "hsl(var(--destructive))", // #CF222E -> 356 71.4% 47.3% (prompt: 356 71.4% 59%)
-          foreground: "hsl(var(--destructive-foreground))", // #F6F8FA
+          DEFAULT: "hsl(var(--destructive))",
+          foreground: "hsl(var(--destructive-foreground))",
         },
-        success: { // Added for success states like green buttons
-          DEFAULT: "hsl(var(--success))", // #2DA44E -> 148 62.1% 40.8%
-          foreground: "hsl(var(--success-foreground))", // #F6F8FA
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
         },
         muted: {
-          DEFAULT: "hsl(var(--muted))", // #F6F8FA -> 210 16.7% 97.3%
-          foreground: "hsl(var(--muted-foreground))", // #636C76 -> 214 7% 43.4%
+          DEFAULT: "hsl(var(--muted))",
+          foreground: "hsl(var(--muted-foreground))",
         },
-        accent: { // For hover/active states on muted elements
-          DEFAULT: "hsl(var(--accent))", // #F6F8FA (often a slightly darker shade or primary interaction for hover)
-                                        // For GitHub, hover on gray buttons often darkens them slightly, or uses border.
-                                        // Using #F0F2F4 (a slightly darker gray) could be an option, or rely on border/opacity.
-                                        // For now, sticking to prompt's accent mapping.
-          foreground: "hsl(var(--accent-foreground))", // #24292F
+        accent: {
+          DEFAULT: "hsl(var(--accent))",
+          foreground: "hsl(var(--accent-foreground))",
         },
         popover: {
-          DEFAULT: "hsl(var(--popover))", // #FFFFFF
-          foreground: "hsl(var(--popover-foreground))", // #24292F
+          DEFAULT: "hsl(var(--popover))",
+          foreground: "hsl(var(--popover-foreground))",
         },
         card: {
-          DEFAULT: "hsl(var(--card))", // #FFFFFF
-          foreground: "hsl(var(--card-foreground))", // #24292F
+          DEFAULT: "hsl(var(--card))",
+          foreground: "hsl(var(--card-foreground))",
         },
       },
       borderRadius: {
-        lg: "var(--radius)", // default 0.5rem
-        md: "calc(var(--radius) - 2px)", // default 0.375rem
-        sm: "calc(var(--radius) - 4px)", // default 0.25rem
+        lg: "var(--radius)", // e.g., 0.75rem for a softer look
+        md: "calc(var(--radius) - 0.25rem)", // e.g., 0.5rem
+        sm: "calc(var(--radius) - 0.375rem)", // e.g., 0.375rem
       },
       fontFamily: {
-        sans: ["var(--font-inter)", "sans-serif"], // Inter for body
-        // headings can use font-semibold or font-bold with Inter
+        sans: ["var(--font-inter)", "sans-serif"],
       },
       keyframes: {
         "accordion-down": {
@@ -84,13 +83,14 @@ module.exports = {
         "accordion-up": "accordion-up 0.2s ease-out",
       },
       boxShadow: {
-        // GitHub-like shadows
-        'sm': '0 1px 0 rgba(27, 31, 36, 0.04)', // Subtle shadow for less prominent elements
-        'md': '0 3px 6px rgba(140,149,159,.15)', // Common card shadow
-        'lg': '0 8px 24px rgba(140,149,159,.2)', // For modals or larger popovers
-        'header': '0 1px 0 rgba(27, 31, 36, 0.04)', // Shadow for header bottom border effect if needed
-      }
+        // Modern, subtle shadows
+        sm: "0 1px 2px 0 rgba(0, 0, 0, 0.05)",
+        md: "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
+        lg: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
+        xl: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+        header: "0 1px 2px 0 rgba(0, 0, 0, 0.03)", // Subtle shadow for header
+      },
     },
   },
   plugins: [require("tailwindcss-animate")],
-}
+};
