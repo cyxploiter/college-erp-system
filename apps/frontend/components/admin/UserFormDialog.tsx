@@ -1,8 +1,7 @@
-
 'use client';
 
 import React, { useEffect, useMemo } from 'react'; 
-import { useForm, Controller } from 'react-hook-form';
+import { useForm, Controller, Resolver } from 'react-hook-form'; // Added Resolver
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import {
@@ -30,7 +29,6 @@ const userRoles = ['student', 'faculty', 'admin', 'superuser'] as const;
 const baseUserFormSchema = z.object({
   name: z.string().min(3, "Full name must be at least 3 characters").max(100, "Name too long"),
   email: z.string().email("Invalid email address"),
-  profilePictureUrl: z.string().url("Invalid URL for profile picture.").optional().nullable(),
   password: z.string().optional(), // Optional for edit, required for create (refined later)
   role: z.enum(userRoles, { required_error: "Role is required" }),
   departmentId: z.string().optional().nullable(), // Department ID from select is string
@@ -45,10 +43,6 @@ const baseUserFormSchema = z.object({
   currentYearOfStudy: z.preprocess(
     (val) => (val === "" || val === null || val === undefined) ? null : (typeof val === 'string' && val.trim() !== '' ? parseInt(val, 10) : val),
     z.number().int().min(1).max(10).optional().nullable()
-  ),
-  gpa: z.preprocess(
-    (val) => (val === "" || val === null || val === undefined) ? null : (typeof val === 'string' && val.trim() !== '' ? parseFloat(val) : val),
-    z.number().min(0).max(10, "GPA must be between 0 and 10").optional().nullable()
   ),
   academicStatus: z.string().max(50).optional().nullable(),
   fatherName: z.string().max(100).optional().nullable(),
@@ -83,7 +77,7 @@ interface UserFormDialogProps {
 
 // Maps UserProfileResponse (where departmentId is number) to UserFormValues (where departmentId is string for select)
 const mapProfileToFormValues = (profile?: UserProfileResponse | null): Partial<UserFormValues> => {
-  if (!profile) return { role: 'student', departmentId: null }; 
+  if (!profile) return { role: 'student', departmentId: null, academicStatus: null }; 
   
   let formDepartmentId: string | null = null;
   if (profile.role === 'faculty' && profile.facultyDetails?.departmentId) {
@@ -95,7 +89,7 @@ const mapProfileToFormValues = (profile?: UserProfileResponse | null): Partial<U
   return {
     name: profile.name,
     email: profile.email,
-    profilePictureUrl: profile.profilePictureUrl,
+
     role: profile.role,
     departmentId: formDepartmentId,
 
@@ -103,8 +97,7 @@ const mapProfileToFormValues = (profile?: UserProfileResponse | null): Partial<U
     branch: profile.studentDetails?.branch || undefined,
     expectedGraduationYear: profile.studentDetails?.expectedGraduationYear || undefined,
     currentYearOfStudy: profile.studentDetails?.currentYearOfStudy || undefined,
-    gpa: profile.studentDetails?.gpa || undefined,
-    academicStatus: profile.studentDetails?.academicStatus || undefined,
+    academicStatus: profile.studentDetails?.academicStatus || null,
     fatherName: profile.studentDetails?.fatherName || undefined,
     motherName: profile.studentDetails?.motherName || undefined,
     dateOfBirth: profile.studentDetails?.dateOfBirth ? profile.studentDetails.dateOfBirth.split('T')[0] : undefined,
@@ -120,6 +113,8 @@ const mapProfileToFormValues = (profile?: UserProfileResponse | null): Partial<U
   };
 };
 
+const DEPT_NONE_VALUE = "__DEPT_NONE__";
+const ACADEMIC_STATUS_NONE_VALUE = "__ACADEMIC_NONE__";
 
 export function UserFormDialog({
   isOpen,
@@ -141,7 +136,7 @@ export function UserFormDialog({
         });
       }
       // For faculty, departmentId (string from form) must be present and a valid number.
-      if (data.role === 'faculty' && (!data.departmentId || isNaN(parseInt(data.departmentId)))) {
+      if (data.role === 'faculty' && (!data.departmentId || isNaN(parseInt(data.departmentId)) || data.departmentId === DEPT_NONE_VALUE)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: "Department is required for faculty.",
@@ -171,8 +166,8 @@ export function UserFormDialog({
 
 
   const form = useForm<UserFormValues>({
-    resolver: zodResolver(refinedUserFormSchema),
-    defaultValues: mapProfileToFormValues(defaultValues || { role: 'student', departmentId: null }),
+    resolver: zodResolver(refinedUserFormSchema) as Resolver<UserFormValues, any>, // Cast applied here
+    defaultValues: mapProfileToFormValues(defaultValues || { role: 'student', departmentId: null, academicStatus: null }),
   });
 
   const { register, handleSubmit, control, watch, reset, formState: { errors } } = form;
@@ -180,7 +175,7 @@ export function UserFormDialog({
 
   useEffect(() => {
     if (isOpen) {
-      reset(mapProfileToFormValues(defaultValues || { role: 'student', departmentId: null }));
+      reset(mapProfileToFormValues(defaultValues || { role: 'student', departmentId: null, academicStatus: null }));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, defaultValues, reset]);
@@ -191,7 +186,7 @@ export function UserFormDialog({
         delete submissionData.password;
     }
     // Convert departmentId from string to number for the onSubmit callback
-    const numericDepartmentId = data.departmentId ? parseInt(data.departmentId, 10) : null;
+    const numericDepartmentId = data.departmentId && data.departmentId !== DEPT_NONE_VALUE ? parseInt(data.departmentId, 10) : null;
     await onSubmit({ ...submissionData, departmentId: numericDepartmentId }, isEditing);
   };
 
@@ -207,7 +202,7 @@ export function UserFormDialog({
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4 pt-2">
-          <ScrollArea className="max-h-[65vh] p-1 pr-4"> 
+          <ScrollArea className="max-h-[65vh] overflow-y-auto p-1 pr-4"> 
             <div className="space-y-4 px-1"> 
               <div>
                 <Label htmlFor="name">Full Name <span className="text-destructive">*</span></Label>
@@ -221,11 +216,6 @@ export function UserFormDialog({
                 {errors.email && <p className="text-xs text-destructive mt-1">{errors.email.message}</p>}
               </div>
               
-              <div>
-                <Label htmlFor="profilePictureUrl">Profile Picture URL</Label>
-                <Input id="profilePictureUrl" type="url" {...register('profilePictureUrl')} className="mt-1" placeholder="https://example.com/image.png" aria-invalid={!!errors.profilePictureUrl} />
-                {errors.profilePictureUrl && <p className="text-xs text-destructive mt-1">{errors.profilePictureUrl.message}</p>}
-              </div>
 
 
               {!isEditing && (
@@ -276,12 +266,15 @@ export function UserFormDialog({
                     name="departmentId"
                     control={control}
                     render={({ field }) => (
-                      <Select onValueChange={field.onChange} value={field.value || undefined}>
+                        <Select
+                            onValueChange={(selectedValue) => field.onChange(selectedValue === DEPT_NONE_VALUE ? null : selectedValue)}
+                            value={field.value ?? DEPT_NONE_VALUE}
+                        >
                         <SelectTrigger id="departmentId" className="w-full mt-1" aria-invalid={!!errors.departmentId}>
                           <SelectValue placeholder={selectedRole === 'faculty' ? "Select a department (Required)" : "Select a department (Optional)"} />
                         </SelectTrigger>
                         <SelectContent>
-                           <SelectItem value="">None</SelectItem> {/* Explicit None option */}
+                           <SelectItem value={DEPT_NONE_VALUE}>None</SelectItem>
                           {departments.map(dept => (
                             <SelectItem key={dept.id} value={String(dept.id)}>{dept.name}</SelectItem>
                           ))}
@@ -353,23 +346,22 @@ export function UserFormDialog({
                     </div>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                        <Label htmlFor="gpa">GPA</Label>
-                        <Input id="gpa" type="number" step="0.01" {...register('gpa')} className="mt-1" placeholder="e.g., 8.5" />
-                        {errors.gpa && <p className="text-xs text-destructive mt-1">{errors.gpa.message}</p>}
-                    </div>
+                  
                     <div>
                         <Label htmlFor="academicStatus">Academic Status</Label>
                          <Controller
                             name="academicStatus"
                             control={control}
                             render={({ field }) => (
-                                <Select onValueChange={field.onChange} value={field.value || undefined}>
+                                <Select
+                                    onValueChange={(selectedValue) => field.onChange(selectedValue === ACADEMIC_STATUS_NONE_VALUE ? null : selectedValue)}
+                                    value={field.value ?? ACADEMIC_STATUS_NONE_VALUE}
+                                >
                                 <SelectTrigger id="academicStatus" className="w-full mt-1">
                                     <SelectValue placeholder="Select status" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="">None</SelectItem>
+                                    <SelectItem value={ACADEMIC_STATUS_NONE_VALUE}>None</SelectItem>
                                     <SelectItem value="Good Standing">Good Standing</SelectItem>
                                     <SelectItem value="Probation">Probation</SelectItem>
                                     <SelectItem value="Suspended">Suspended</SelectItem>

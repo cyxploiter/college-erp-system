@@ -1,12 +1,13 @@
-import db from "./db"; // Import the opened db connection
-import logger from "@/utils/logger";
+
+import db from './db'; // Import the opened db connection
+import logger from '@/utils/logger';
 
 // Declare Node.js globals for TypeScript
 declare const require: any;
 declare const module: any;
 
 const createSchema = async () => {
-  logger.info("Starting database schema initialization...");
+  logger.info('Starting database schema initialization...');
 
   const createDepartmentsTable = `
     CREATE TABLE IF NOT EXISTS departments (
@@ -81,7 +82,7 @@ const createSchema = async () => {
       FOREIGN KEY (userId) REFERENCES users (id) ON DELETE CASCADE
     );
   `;
-
+  
   const createSuperusersTable = `
     CREATE TABLE IF NOT EXISTS superusers (
       id INTEGER PRIMARY KEY AUTOINCREMENT, -- Internal ID
@@ -129,7 +130,7 @@ const createSchema = async () => {
       semesterId INTEGER NOT NULL,
       facultyUserId TEXT, -- Changed from INTEGER, links to users.id
       roomNumber TEXT, 
-      maxCapacity INTEGER,
+      maxCapacity INTEGER NOT NULL DEFAULT 60, -- MODIFIED: Added NOT NULL DEFAULT 60
       createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
       updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (courseId) REFERENCES courses (id) ON DELETE CASCADE,
@@ -138,7 +139,7 @@ const createSchema = async () => {
       UNIQUE (courseId, semesterId, sectionCode)
     );
   `;
-
+  
   const createSchedulesTable = `
     CREATE TABLE IF NOT EXISTS schedules (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -183,7 +184,7 @@ const createSchema = async () => {
       FOREIGN KEY (receiverId) REFERENCES users (id) ON DELETE SET NULL
     );
   `;
-
+  
   const createUpdatedAtTrigger = (tableName: string) => `
     CREATE TRIGGER IF NOT EXISTS update_${tableName}_updatedAt
     AFTER UPDATE ON ${tableName}
@@ -196,90 +197,57 @@ const createSchema = async () => {
   try {
     await new Promise<void>((resolve, reject) => {
       db.serialize(() => {
-        const execLog = (
-          sql: string,
-          tableName: string,
-          cb?: (err: Error | null) => void
-        ) => {
+        const execLog = (sql: string, tableName: string, cb?: (err: Error | null) => void) => {
           db.exec(sql, (err) => {
-            if (err)
-              return reject(
-                new Error(
-                  `Failed to create/update ${tableName}: ${err.message}`
-                )
-              );
-            logger.info(
-              `${tableName} table/trigger created or already exists.`
-            );
+            if (err) return reject(new Error(`Failed to create/update ${tableName}: ${err.message}`));
+            logger.info(`${tableName} table/trigger created or already exists.`);
             if (cb) cb(null);
           });
         };
 
-        execLog(createDepartmentsTable, "departments");
-        execLog(createUsersTable, "users");
-        execLog(createStudentsTable, "students");
-        execLog(createFacultyTable, "faculty");
-        execLog(createAdminsTable, "admins");
-        execLog(createSuperusersTable, "superusers");
-        execLog(createCoursesTable, "courses");
-        execLog(createSemestersTable, "semesters");
-        execLog(createSectionsTable, "sections");
-        execLog(createSchedulesTable, "schedules (meetings)");
-        execLog(createStudentEnrollmentsTable, "student_section_enrollments");
-        execLog(createMessagesTable, "messages");
+        execLog(createDepartmentsTable, 'departments');
+        execLog(createUsersTable, 'users');
+        execLog(createStudentsTable, 'students');
+        execLog(createFacultyTable, 'faculty');
+        execLog(createAdminsTable, 'admins');
+        execLog(createSuperusersTable, 'superusers'); 
+        execLog(createCoursesTable, 'courses');
+        execLog(createSemestersTable, 'semesters');
+        execLog(createSectionsTable, 'sections');
+        execLog(createSchedulesTable, 'schedules (meetings)');
+        execLog(createStudentEnrollmentsTable, 'student_section_enrollments');
+        execLog(createMessagesTable, 'messages');
 
-        const tablesForTriggers = [
-          "users",
-          "departments",
-          "students",
-          "faculty",
-          "admins",
-          "superusers",
-          "courses",
-          "semesters",
-          "sections",
-          "schedules",
-          "student_section_enrollments",
-          "messages",
-        ];
+        const tablesForTriggers = ['users', 'departments', 'students', 'faculty', 'admins', 'superusers', 'courses', 'semesters', 'sections', 'schedules', 'student_section_enrollments', 'messages'];
         let triggersCreated = 0;
-        tablesForTriggers.forEach((table) => {
+        tablesForTriggers.forEach(table => {
           // The 'id' column in users is TEXT, but trigger condition `WHERE id = OLD.id` should still work.
-          execLog(
-            createUpdatedAtTrigger(table),
-            `${table} updatedAt trigger`,
-            () => {
-              triggersCreated++;
-              if (triggersCreated === tablesForTriggers.length) {
-                db.exec("SELECT 1", (err) => {
-                  if (err)
-                    return reject(
-                      new Error(`Finalizing schema error: ${err.message}`)
-                    );
-                  resolve();
-                });
-              }
+          execLog(createUpdatedAtTrigger(table), `${table} updatedAt trigger`, () => {
+            triggersCreated++;
+            if (triggersCreated === tablesForTriggers.length) {
+              db.exec("SELECT 1", (err) => { 
+                 if (err) return reject(new Error(`Finalizing schema error: ${err.message}`));
+                 resolve();
+              });
             }
-          );
+          });
         });
       });
     });
-    logger.info("Database schema initialized successfully.");
+    logger.info('Database schema initialized successfully.');
   } catch (error) {
     const err = error as Error;
-    logger.error("Error initializing database schema:", err.message);
+    logger.error('Error initializing database schema:', err.message);
     (process as any).exit(1);
   } finally {
     if (require.main === module) {
-      db.close((err) => {
-        if (err) {
-          logger.error("Error closing database connection:", err.message);
-        } else {
-          logger.info(
-            "Database connection closed after schema initialization."
-          );
-        }
-      });
+        db.close((err) => {
+          if (err) {
+            logger.error('Error closing database connection:', err.message);
+          } else {
+            logger.info('Database connection closed after schema initialization.');
+          }
+        });
     }
   }
 };

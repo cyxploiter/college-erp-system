@@ -1,5 +1,6 @@
-import { UserRole } from "../api/general.api";
-import { User } from "./user.model";
+
+import { UserRole } from '../api/general.api'; 
+import { User } from './user.model'; 
 
 export interface Message {
   id: number;
@@ -8,12 +9,9 @@ export interface Message {
   subject: string;
   content: string;
   timestamp: string; // ISO date string
-  priority: "Normal" | "Urgent" | "Critical";
-  type: "Broadcast" | "Direct";
+  priority: 'Normal' | 'Urgent' | 'Critical';
+  type: 'Broadcast' | 'Direct'; 
   createdAt: string; // ISO date string
-  isRead?: boolean;
-  sender?: Partial<Omit<User, "id"> & { id?: string }> & {
-    role?: UserRole;
-    senderUsername?: string;
-  }; // User.id is now string
+  isRead?: boolean; 
+  sender?: Partial<Omit<User, 'id'> & { id?: string }> & { role?: UserRole; senderUsername?: string }; // User.id is now string
 }

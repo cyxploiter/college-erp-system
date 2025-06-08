@@ -10,11 +10,11 @@ export const validate = (schema: AnyZodObject) =>
       query: (req as any).query,
       params: (req as any).params,
     });
-    return next();
+    return (next as any)();
   } catch (error) {
     if (error instanceof ZodError) {
-      return next(error); // Pass to centralized error handler
+      return (next as any)(error); // Pass to centralized error handler
     }
-    return next(new Error('Internal validation error'));
+    return (next as any)(new Error('Internal validation error'));
   }
 };

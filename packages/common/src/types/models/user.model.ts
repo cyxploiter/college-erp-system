@@ -4,11 +4,11 @@
 
 export interface User {
   id: string; // Changed from number
-  name: string;
+  name: string; 
   passwordHash?: string; // Should not be sent to client
   email: string;
-  profilePictureUrl?: string | null;
-  departmentId?: number | null;
+  profilePictureUrl?: string | null; 
+  departmentId?: number | null; 
   createdAt: string; // ISO date string
   updatedAt: string; // ISO date string
 }
@@ -18,21 +18,23 @@ export interface StudentDetail {
   userId: string; // Foreign key to users table, Changed from number
   // studentRegistrationId: string; // REMOVED - This is now users.id
   enrollmentDate?: string | null; // ISO date string
+  
+  program?: string | null; 
+  branch?: string | null; 
+  
+  expectedGraduationYear?: number | null; 
+  currentYearOfStudy?: number | null; 
+  gpa?: number | null; 
+  academicStatus?: string | null; 
 
-  program?: string | null;
-  branch?: string | null;
+  fatherName?: string | null; 
+  motherName?: string | null; 
+  dateOfBirth?: string | null; 
+  phoneNumber?: string | null; 
+  permanentAddress?: string | null; 
+  currentAddress?: string | null; 
 
-  expectedGraduationYear?: number | null;
-  currentYearOfStudy?: number | null;
-  gpa?: number | null;
-  academicStatus?: string | null;
-
-  fatherName?: string | null;
-  motherName?: string | null;
-  dateOfBirth?: string | null;
-  phoneNumber?: string | null;
-  permanentAddress?: string | null;
-  currentAddress?: string | null;
+  enrolledSectionIds?: number[]; // Added for managing section enrollments
 
   createdAt: string;
   updatedAt: string;
@@ -42,9 +44,10 @@ export interface FacultyDetail {
   id: number; // Internal primary key for the faculty table itself
   userId: string; // Foreign key to users table, Changed from number
   // facultyEmployeeId: string; // REMOVED - This is now users.id
-  departmentId: number;
+  departmentId: number; 
   officeNumber?: string | null;
   specialization?: string | null;
+  assignedSectionIds?: number[]; // Added for managing section assignments
   createdAt: string;
   updatedAt: string;
 }
@@ -53,7 +56,7 @@ export interface AdminDetail {
   id: number; // Internal primary key for the admins table itself
   userId: string; // Foreign key to users table, Changed from number
   // adminEmployeeId: string; // REMOVED - This is now users.id
-  permissionLevel?: string | null;
+  permissionLevel?: string | null; 
   createdAt: string;
   updatedAt: string;
 }
